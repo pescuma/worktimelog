@@ -1,0 +1,24 @@
+struct Task
+{
+	Char name[512];
+};
+
+struct Time
+{
+	Task task;
+	DateTime start;
+	DateTime end;
+	
+	INDEX(start);
+	INDEX(end);
+};
+
+struct Options
+{
+	Time currentTime;
+	DateTime lastCheck;
+	
+	Int32 stopTimeMs;
+	Int32 startTimeMs;
+	Int32 idleDuringStartTimeMs;
+};
