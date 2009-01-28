@@ -89,6 +89,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
+	hInst = hInstance;
+
 	setlocale(LC_ALL, "");
 
 	try 
@@ -308,6 +310,10 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	{
 		case WM_INITDIALOG:
 		{
+			HICON hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_TIMELOG));
+			SendMessage(hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
+			SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
+
 			showLog(GetDlgItem(hWnd, IDC_OUT));
 
 			Options opts = Options::query(&db, 1);

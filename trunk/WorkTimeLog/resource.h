@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by TimeLog.rc
+// Used by WorkTimeLog.rc
 //
 #define IDC_MYICON                      2
 #define IDD_TIMELOG_DIALOG              102
