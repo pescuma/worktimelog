@@ -14,6 +14,37 @@ namespace sqlite {
 
 	class Statement;
 
+	class NullRange {};
+
+	template<class T>
+	class Range
+	{
+	public:
+		Range() : _start(NULL), _end(NULL), onlyOne(true) {}
+		Range(NullRange &dummy) : _start(NULL), _end(NULL), onlyOne(true) {}
+		Range(const T &value) : _start(&value), _end(&value), onlyOne(true) {}
+		Range(const T *value) : _start(value), _end(value), onlyOne(true) {}
+		Range(const T &start, const T &end) : _start(&start), _end(&end), onlyOne(false) {}
+		Range(const T *start, const T *end) : _start(start), _end(end), onlyOne(false) {}
+		Range(const T &start, const T *end) : _start(&start), _end(end), onlyOne(false) {}
+		Range(const T *start, const T &end) : _start(start), _end(&end), onlyOne(false) {}
+
+		bool hasStart() { return _start != NULL; }
+		bool hasEnd() { return _end != NULL; }
+		bool isSingleValue() { return onlyOne; }
+		bool isNull() { return !hasStart() && !hasEnd(); }
+
+		const T & start() { return *_start; }
+		const T & end() { return *_end; }
+
+	private:
+		const T *_start;
+		const T *_end;
+		bool onlyOne;
+	};
+
+	static inline NullRange ANY() { return NullRange(); }
+
 
 	class Database
 	{

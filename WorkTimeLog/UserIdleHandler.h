@@ -19,8 +19,8 @@ public:
 	void setStopTimeMs(unsigned int stopTimeMs);
 	void setIsIdle(bool isIdle);
 
-	void addOnIdleCallback(UserIdleHandlerCallback cb, void *param);
-	void addOnReturnCallback(UserIdleHandlerCallback cb, void *param);
+	void addOnIdleCallback(UserIdleHandlerCallback cb, void *param = NULL);
+	void addOnReturnCallback(UserIdleHandlerCallback cb, void *param = NULL);
 
 	void startTracking();
 	void stopTracking();

@@ -35,6 +35,12 @@ Time::~Time()
 }
 
 
+void Time::connectTo(sqlite::Database *db)
+{
+	this->db = db;
+}
+
+
 void Time::store()
 {
 	store(db, this);
@@ -43,9 +49,14 @@ void Time::store()
 
 void Time::remove()
 {
-	delete(db, this);
+	remove(db, this);
 }
 
+
+bool Time::isStored()
+{
+	return id > 0;
+}
 
 
 void Time::createTable(sqlite::Database *db)
@@ -112,7 +123,7 @@ std::vector<Time> Time::queryAll(sqlite::Database *db)
 }
 
 
-std::vector<Time> Time::queryAll(sqlite::Database *db, Task *pTask, time_t *pStart, time_t *pEnd, const TCHAR *pOrderBy)
+std::vector<Time> Time::queryAll(sqlite::Database *db, sqlite::Range<Task> pTask, sqlite::Range<time_t> pStart, sqlite::Range<time_t> pEnd, const TCHAR *pOrderBy)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
@@ -122,22 +133,58 @@ std::vector<Time> Time::queryAll(sqlite::Database *db, Task *pTask, time_t *pSta
 	std::tstring sql = _T("SELECT * FROM Time ");
 	
 	bool hasWhere = false;
-	if (pTask != NULL)
+	if (!pTask.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("taskID == ? ");
+		if (pTask.isSingleValue())
+		{
+			sql += _T("taskID == ? ");
+		}
+		else
+		{
+			if (pTask.hasStart())
+				sql += _T("taskID >= ? ");
+			if (pTask.hasStart() && pTask.hasEnd())
+				sql += _T("AND ");
+			if (pTask.hasEnd())
+				sql += _T("taskID < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pStart != NULL)
+	if (!pStart.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("start == ? ");
+		if (pStart.isSingleValue())
+		{
+			sql += _T("start == ? ");
+		}
+		else
+		{
+			if (pStart.hasStart())
+				sql += _T("start >= ? ");
+			if (pStart.hasStart() && pStart.hasEnd())
+				sql += _T("AND ");
+			if (pStart.hasEnd())
+				sql += _T("start < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pEnd != NULL)
+	if (!pEnd.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("end == ? ");
+		if (pEnd.isSingleValue())
+		{
+			sql += _T("end == ? ");
+		}
+		else
+		{
+			if (pEnd.hasStart())
+				sql += _T("end >= ? ");
+			if (pEnd.hasStart() && pEnd.hasEnd())
+				sql += _T("AND ");
+			if (pEnd.hasEnd())
+				sql += _T("end < ? ");
+		}
 		hasWhere = true;
 	}
 	
@@ -150,12 +197,27 @@ std::vector<Time> Time::queryAll(sqlite::Database *db, Task *pTask, time_t *pSta
 	sqlite::Statement stmt = db->prepare(sql.c_str());
 	
 	int bind = 1;
-	if (pTask != NULL)
-		stmt.bind(bind++, pTask->id);
-	if (pStart != NULL)
-		stmt.bind(bind++, (sqlite3_int64) *pStart);
-	if (pEnd != NULL)
-		stmt.bind(bind++, (sqlite3_int64) *pEnd);
+	if (!pTask.isNull())
+	{
+		if (pTask.hasStart())
+			stmt.bind(bind++, pTask.start().id);
+		if (!pTask.isSingleValue() && pTask.hasEnd())
+			stmt.bind(bind++, pTask.end().id);
+	}
+	if (!pStart.isNull())
+	{
+		if (pStart.hasStart())
+			stmt.bind(bind++, (sqlite3_int64) pStart.start());
+		if (!pStart.isSingleValue() && pStart.hasEnd())
+			stmt.bind(bind++, (sqlite3_int64) pStart.end());
+	}
+	if (!pEnd.isNull())
+	{
+		if (pEnd.hasStart())
+			stmt.bind(bind++, (sqlite3_int64) pEnd.start());
+		if (!pEnd.isSingleValue() && pEnd.hasEnd())
+			stmt.bind(bind++, (sqlite3_int64) pEnd.end());
+	}
 	
 	while (stmt.step())
 		ret.push_back(Time(db, &stmt));
