@@ -112,10 +112,6 @@ void UserIdleHandler::startTimer()
 
 	time = max(100, time / 3);
 
-//	TCHAR tmp[1024];
-//	_sntprintf_s(tmp, 1024, _T("Start time %d\n"), time);
-//	OutputDebugString(tmp);
-
 	hTimer = SetTimer(0, (UINT_PTR) this, time, UserIdleHandler::StaticOnTimer);
 }
 

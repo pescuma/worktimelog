@@ -28,6 +28,12 @@ Task::~Task()
 }
 
 
+void Task::connectTo(sqlite::Database *db)
+{
+	this->db = db;
+}
+
+
 void Task::store()
 {
 	store(db, this);
@@ -36,9 +42,14 @@ void Task::store()
 
 void Task::remove()
 {
-	delete(db, this);
+	remove(db, this);
 }
 
+
+bool Task::isStored()
+{
+	return id > 0;
+}
 
 
 void Task::createTable(sqlite::Database *db)
@@ -95,7 +106,7 @@ std::vector<Task> Task::queryAll(sqlite::Database *db)
 }
 
 
-std::vector<Task> Task::queryAll(sqlite::Database *db, std::tstring *pName, const TCHAR *pOrderBy)
+std::vector<Task> Task::queryAll(sqlite::Database *db, sqlite::Range<std::tstring> pName, const TCHAR *pOrderBy)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
@@ -105,10 +116,22 @@ std::vector<Task> Task::queryAll(sqlite::Database *db, std::tstring *pName, cons
 	std::tstring sql = _T("SELECT * FROM Task ");
 	
 	bool hasWhere = false;
-	if (pName != NULL)
+	if (!pName.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("name == ? ");
+		if (pName.isSingleValue())
+		{
+			sql += _T("name == ? ");
+		}
+		else
+		{
+			if (pName.hasStart())
+				sql += _T("name >= ? ");
+			if (pName.hasStart() && pName.hasEnd())
+				sql += _T("AND ");
+			if (pName.hasEnd())
+				sql += _T("name < ? ");
+		}
 		hasWhere = true;
 	}
 	
@@ -121,8 +144,13 @@ std::vector<Task> Task::queryAll(sqlite::Database *db, std::tstring *pName, cons
 	sqlite::Statement stmt = db->prepare(sql.c_str());
 	
 	int bind = 1;
-	if (pName != NULL)
-		stmt.bind(bind++, pName->c_str());
+	if (!pName.isNull())
+	{
+		if (pName.hasStart())
+			stmt.bind(bind++, pName.start().c_str());
+		if (!pName.isSingleValue() && pName.hasEnd())
+			stmt.bind(bind++, pName.end().c_str());
+	}
 	
 	while (stmt.step())
 		ret.push_back(Task(db, &stmt));

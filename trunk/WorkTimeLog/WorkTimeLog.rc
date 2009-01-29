@@ -82,12 +82,39 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,113,41,50,14,WS_GROUP
 END
 
-IDD_MAIN DIALOGEX 0, 0, 316, 180
+IDD_MAIN DIALOGEX 0, 0, 316, 218
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_MINIMIZEBOX | WS_CAPTION | WS_SYSMENU
 CAPTION "Work Time Log"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    EDITTEXT        IDC_OUT,7,7,302,166,ES_MULTILINE | ES_AUTOHSCROLL | ES_WANTRETURN
+    EDITTEXT        IDC_OUT,7,21,302,190,ES_MULTILINE | ES_AUTOHSCROLL | ES_WANTRETURN
+    LTEXT           "Time worked today:",IDC_TIME_TODAY,7,7,302,11
+END
+
+IDD_IDLE DIALOGEX 0, 0, 332, 214
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_CONTROLPARENT
+CAPTION "Idle time detected - WorkTimeTracker"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "You left your computer at . How would you want to handle this break?",IDC_STATIC,7,16,318,11
+    CONTROL         "Stop counting at",IDC_STOP,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,7,39,67,11
+    CONTROL         "Ignore this break and keep counting",IDC_IGNORE,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,7,58,318,11
+    CONTROL         "Log this break and keep counting old task",IDC_LOG_AND_BACK,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,7,78,318,11
+    CONTROL         "Stop old task and log this time as the new task",IDC_SWITCH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,7,131,318,11
+    CONTROL         "",IDC_STOP_TIME,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_UPDOWN | WS_TABSTOP | 0x8,75,38,63,14
+    LTEXT           "Break started at",IDC_STATIC,18,94,53,10
+    CONTROL         "",IDC_LOG_AND_BACK_TIME,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_UPDOWN | WS_TABSTOP | 0x8,75,91,63,14
+    LTEXT           "Log it as task",IDC_STATIC,18,109,53,10
+    COMBOBOX        IDC_LOG_AND_BACK_TASK,75,108,138,130,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Switch at",IDC_STATIC,18,147,35,10
+    CONTROL         "",IDC_SWITCH_TIME,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_UPDOWN | WS_TABSTOP | 0x8,75,144,63,14
+    LTEXT           "New task",IDC_STATIC,18,162,53,10
+    COMBOBOX        IDC_SWITCH_TASK,75,161,138,130,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,148,193,87,14
+    PUSHBUTTON      "Cancel (Ignore break)",IDCANCEL,238,193,87,14
 END
 
 
@@ -112,7 +139,15 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 309
         TOPMARGIN, 7
-        BOTTOMMARGIN, 173
+        BOTTOMMARGIN, 211
+    END
+
+    IDD_IDLE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 325
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 207
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -155,8 +190,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,0,0,1
- PRODUCTVERSION 0,0,0,1
+ FILEVERSION 0,0,0,2
+ PRODUCTVERSION 0,0,0,2
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -172,12 +207,12 @@ BEGIN
         BLOCK "041604b0"
         BEGIN
             VALUE "FileDescription", "WorkTimeLog"
-            VALUE "FileVersion", "0, 0, 0, 1"
+            VALUE "FileVersion", "0, 0, 0, 2"
             VALUE "InternalName", "WorkTimeLog"
             VALUE "LegalCopyright", "Copyright (C) 2009 - Ricardo Pescuma Domenecci"
             VALUE "OriginalFilename", "WorkTimeLog.exe"
             VALUE "ProductName", "WorkTimeLog"
-            VALUE "ProductVersion", "0, 0, 0, 1"
+            VALUE "ProductVersion", "0, 0, 0, 2"
         END
     END
     BLOCK "VarFileInfo"

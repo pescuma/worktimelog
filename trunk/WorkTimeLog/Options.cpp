@@ -39,6 +39,12 @@ Options::~Options()
 }
 
 
+void Options::connectTo(sqlite::Database *db)
+{
+	this->db = db;
+}
+
+
 void Options::store()
 {
 	store(db, this);
@@ -47,9 +53,14 @@ void Options::store()
 
 void Options::remove()
 {
-	delete(db, this);
+	remove(db, this);
 }
 
+
+bool Options::isStored()
+{
+	return id > 0;
+}
 
 
 void Options::createTable(sqlite::Database *db)
@@ -110,7 +121,7 @@ std::vector<Options> Options::queryAll(sqlite::Database *db)
 }
 
 
-std::vector<Options> Options::queryAll(sqlite::Database *db, Time *pCurrentTime, time_t *pLastCheck, int *pStopTimeMs, int *pStartTimeMs, int *pIdleDuringStartTimeMs, const TCHAR *pOrderBy)
+std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time> pCurrentTime, sqlite::Range<time_t> pLastCheck, sqlite::Range<int> pStopTimeMs, sqlite::Range<int> pStartTimeMs, sqlite::Range<int> pIdleDuringStartTimeMs, const TCHAR *pOrderBy)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
@@ -120,34 +131,94 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, Time *pCurrentTime,
 	std::tstring sql = _T("SELECT * FROM Options ");
 	
 	bool hasWhere = false;
-	if (pCurrentTime != NULL)
+	if (!pCurrentTime.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("currentTimeID == ? ");
+		if (pCurrentTime.isSingleValue())
+		{
+			sql += _T("currentTimeID == ? ");
+		}
+		else
+		{
+			if (pCurrentTime.hasStart())
+				sql += _T("currentTimeID >= ? ");
+			if (pCurrentTime.hasStart() && pCurrentTime.hasEnd())
+				sql += _T("AND ");
+			if (pCurrentTime.hasEnd())
+				sql += _T("currentTimeID < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pLastCheck != NULL)
+	if (!pLastCheck.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("lastCheck == ? ");
+		if (pLastCheck.isSingleValue())
+		{
+			sql += _T("lastCheck == ? ");
+		}
+		else
+		{
+			if (pLastCheck.hasStart())
+				sql += _T("lastCheck >= ? ");
+			if (pLastCheck.hasStart() && pLastCheck.hasEnd())
+				sql += _T("AND ");
+			if (pLastCheck.hasEnd())
+				sql += _T("lastCheck < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pStopTimeMs != NULL)
+	if (!pStopTimeMs.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("stopTimeMs == ? ");
+		if (pStopTimeMs.isSingleValue())
+		{
+			sql += _T("stopTimeMs == ? ");
+		}
+		else
+		{
+			if (pStopTimeMs.hasStart())
+				sql += _T("stopTimeMs >= ? ");
+			if (pStopTimeMs.hasStart() && pStopTimeMs.hasEnd())
+				sql += _T("AND ");
+			if (pStopTimeMs.hasEnd())
+				sql += _T("stopTimeMs < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pStartTimeMs != NULL)
+	if (!pStartTimeMs.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("startTimeMs == ? ");
+		if (pStartTimeMs.isSingleValue())
+		{
+			sql += _T("startTimeMs == ? ");
+		}
+		else
+		{
+			if (pStartTimeMs.hasStart())
+				sql += _T("startTimeMs >= ? ");
+			if (pStartTimeMs.hasStart() && pStartTimeMs.hasEnd())
+				sql += _T("AND ");
+			if (pStartTimeMs.hasEnd())
+				sql += _T("startTimeMs < ? ");
+		}
 		hasWhere = true;
 	}
-	if (pIdleDuringStartTimeMs != NULL)
+	if (!pIdleDuringStartTimeMs.isNull())
 	{
 		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
-		sql += _T("idleDuringStartTimeMs == ? ");
+		if (pIdleDuringStartTimeMs.isSingleValue())
+		{
+			sql += _T("idleDuringStartTimeMs == ? ");
+		}
+		else
+		{
+			if (pIdleDuringStartTimeMs.hasStart())
+				sql += _T("idleDuringStartTimeMs >= ? ");
+			if (pIdleDuringStartTimeMs.hasStart() && pIdleDuringStartTimeMs.hasEnd())
+				sql += _T("AND ");
+			if (pIdleDuringStartTimeMs.hasEnd())
+				sql += _T("idleDuringStartTimeMs < ? ");
+		}
 		hasWhere = true;
 	}
 	
@@ -160,16 +231,41 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, Time *pCurrentTime,
 	sqlite::Statement stmt = db->prepare(sql.c_str());
 	
 	int bind = 1;
-	if (pCurrentTime != NULL)
-		stmt.bind(bind++, pCurrentTime->id);
-	if (pLastCheck != NULL)
-		stmt.bind(bind++, (sqlite3_int64) *pLastCheck);
-	if (pStopTimeMs != NULL)
-		stmt.bind(bind++, *pStopTimeMs);
-	if (pStartTimeMs != NULL)
-		stmt.bind(bind++, *pStartTimeMs);
-	if (pIdleDuringStartTimeMs != NULL)
-		stmt.bind(bind++, *pIdleDuringStartTimeMs);
+	if (!pCurrentTime.isNull())
+	{
+		if (pCurrentTime.hasStart())
+			stmt.bind(bind++, pCurrentTime.start().id);
+		if (!pCurrentTime.isSingleValue() && pCurrentTime.hasEnd())
+			stmt.bind(bind++, pCurrentTime.end().id);
+	}
+	if (!pLastCheck.isNull())
+	{
+		if (pLastCheck.hasStart())
+			stmt.bind(bind++, (sqlite3_int64) pLastCheck.start());
+		if (!pLastCheck.isSingleValue() && pLastCheck.hasEnd())
+			stmt.bind(bind++, (sqlite3_int64) pLastCheck.end());
+	}
+	if (!pStopTimeMs.isNull())
+	{
+		if (pStopTimeMs.hasStart())
+			stmt.bind(bind++, pStopTimeMs.start());
+		if (!pStopTimeMs.isSingleValue() && pStopTimeMs.hasEnd())
+			stmt.bind(bind++, pStopTimeMs.end());
+	}
+	if (!pStartTimeMs.isNull())
+	{
+		if (pStartTimeMs.hasStart())
+			stmt.bind(bind++, pStartTimeMs.start());
+		if (!pStartTimeMs.isSingleValue() && pStartTimeMs.hasEnd())
+			stmt.bind(bind++, pStartTimeMs.end());
+	}
+	if (!pIdleDuringStartTimeMs.isNull())
+	{
+		if (pIdleDuringStartTimeMs.hasStart())
+			stmt.bind(bind++, pIdleDuringStartTimeMs.start());
+		if (!pIdleDuringStartTimeMs.isSingleValue() && pIdleDuringStartTimeMs.hasEnd())
+			stmt.bind(bind++, pIdleDuringStartTimeMs.end());
+	}
 	
 	while (stmt.step())
 		ret.push_back(Options(db, &stmt));

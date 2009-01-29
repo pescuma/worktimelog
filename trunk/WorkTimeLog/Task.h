@@ -27,8 +27,10 @@ public:
 	Task(sqlite::Database *db = NULL);
 	~Task();
 	
+	void connectTo(sqlite::Database *db);
 	void store();
 	void remove();
+	bool isStored();
 	
 	
 	static void createTable(sqlite::Database *db);
@@ -36,7 +38,7 @@ public:
 	
 	static Task query(sqlite::Database *db, sqlite3_int64 id);
 	static std::vector<Task> queryAll(sqlite::Database *db);
-	static std::vector<Task> queryAll(sqlite::Database *db, std::tstring *name = NULL, const TCHAR *orderBy = NULL);
+	static std::vector<Task> queryAll(sqlite::Database *db, sqlite::Range<std::tstring> name = sqlite::ANY(), const TCHAR * orderBy = NULL);
 	
 	static void store(sqlite::Database *db, Task *obj);
 	static void remove(sqlite::Database *db, Task *obj);
