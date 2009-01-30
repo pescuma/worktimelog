@@ -421,9 +421,9 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 			UserIdleHandler *uih = UserIdleHandler::getInstance();
 			
-			uih->setStopTimeMs(5000); //opts.stopTimeMs);
-			uih->setStartTimeMs(5000); //opts.startTimeMs);
-			uih->setIdleDuringStartTimeMs(4000); //opts.idleDuringStartTimeMs);
+			uih->setStopTimeMs(opts.stopTimeMs);
+			uih->setStartTimeMs(opts.startTimeMs);
+			uih->setIdleDuringStartTimeMs(opts.idleDuringStartTimeMs);
 			uih->setIsIdle(true);
 
 			uih->addOnIdleCallback(OnIdle);

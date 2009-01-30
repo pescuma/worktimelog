@@ -143,10 +143,10 @@ void UserIdleHandler::onTimer()
 	time(&inputTS);
 	inputTS -= (now - inputTime) / 1000;
 
-	TCHAR tmp[1024];
-	_sntprintf_s(tmp, 1024, _T("[%d | %d | %d | %d] %s %d\n"), 
-		now, inputTime, now - inputTime, lastStateChangeTime, _T("Check"), state);
-	OutputDebugString(tmp);
+	//TCHAR tmp[1024];
+	//_sntprintf_s(tmp, 1024, _T("[%d | %d | %d | %d] %s %d\n"), 
+	//	now, inputTime, now - inputTime, lastStateChangeTime, _T("Check"), state);
+	//OutputDebugString(tmp);
 
 	switch(state)
 	{
@@ -158,8 +158,8 @@ void UserIdleHandler::onTimer()
 				state = TRYING_TO_USE;
 				lastStateChangeTime = now;
 
-				_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("IDLE -> TRYING_TO_USE"));
-				OutputDebugString(tmp);
+				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("IDLE -> TRYING_TO_USE"));
+				//OutputDebugString(tmp);
 			}
 			break;
 		}
@@ -170,8 +170,8 @@ void UserIdleHandler::onTimer()
 				state = IDLE;
 				lastStateChangeTime = now;
 
-				_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> IDLE"));
-				OutputDebugString(tmp);
+				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> IDLE"));
+				//OutputDebugString(tmp);
 			}
 			else if (now - lastStateChangeTime > startTimeMs)
 			{
@@ -180,8 +180,8 @@ void UserIdleHandler::onTimer()
 
 				onReturn(inputTS);
 
-				_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> USING"));
-				OutputDebugString(tmp);
+				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> USING"));
+				//OutputDebugString(tmp);
 			}
 			break;
 		}
@@ -194,8 +194,8 @@ void UserIdleHandler::onTimer()
 
 				onIdle(inputTS);
 
-				_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("USING -> IDLE"));
-				OutputDebugString(tmp);
+				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("USING -> IDLE"));
+				//OutputDebugString(tmp);
 			}
 			break;
 		}
