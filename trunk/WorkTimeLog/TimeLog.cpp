@@ -399,7 +399,7 @@ void showTodayWork(HWND ctrl)
 	dt = GetTickCount() - dt;
 
 	TCHAR tmp[1024];
-	_sntprintf_s(tmp, 128, _T("Time worked today: %dh %2dm"), total / (60 * 60), (total / 60) % 60);
+	_sntprintf_s(tmp, 128, _T("Time worked today: %2dh %2dm"), total / (60 * 60), (total / 60) % 60);
 	SetWindowText(ctrl, tmp);
 }
 
@@ -489,7 +489,7 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				opts.store();
 			}
 
-			EndDialog(hWnd, 0);
+			DestroyWindow(hWnd);
 			return FALSE;
 		}
 
