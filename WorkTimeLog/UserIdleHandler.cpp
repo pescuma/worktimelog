@@ -144,8 +144,9 @@ void UserIdleHandler::onTimer()
 	inputTS -= (now - inputTime) / 1000;
 
 	TCHAR tmp[1024];
-//	_sntprintf_s(tmp, 1024, _T("[%d] %s %d\n"), now, _T("Check"), state);
-//	OutputDebugString(tmp);
+	_sntprintf_s(tmp, 1024, _T("[%d | %d | %d | %d] %s %d\n"), 
+		now, inputTime, now - inputTime, lastStateChangeTime, _T("Check"), state);
+	OutputDebugString(tmp);
 
 	switch(state)
 	{
