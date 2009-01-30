@@ -1,24 +1,8 @@
 #include "stdafx.h"
 #include "TimeLog.h"
 
-#define MAX_LOADSTRING 100
 
-// Global Variables:
-HINSTANCE hInst;								// current instance
-TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
-TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-
-
-// Forward declarations of functions included in this code module:
-ATOM				MyRegisterClass(HINSTANCE hInstance);
-BOOL				InitInstance(HINSTANCE, int);
-LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	MainWndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	IdleWndProc(HWND, UINT, WPARAM, LPARAM);
-
-HWND hMain = 0;
-
+using namespace sqlite;
 
 struct IdleDialogData
 {
@@ -26,10 +10,22 @@ struct IdleDialogData
 	Time log;
 };
 
-using namespace sqlite;
 
+// Global Variables:
+HINSTANCE hInst;
 Database db;
 Options opts;
+HWND hMainDlg = NULL;
+HWND hIdleDlg = NULL;
+
+
+// Forward declarations of functions included in this code module:
+INT_PTR CALLBACK	MainWndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	IdleWndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+
+BOOL ProcessIdleMessage(HWND hWnd, MSG *msg);
+
 
 
 void createTables()
@@ -101,6 +97,26 @@ void recoverFromCrash()
 */
 }
 
+void ShowMainDlg()
+{
+	if (hMainDlg == NULL)
+		hMainDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_MAIN), NULL, MainWndProc);
+
+	SetForegroundWindow(hMainDlg);
+	SetFocus(hMainDlg);
+	ShowWindow(hMainDlg, SW_SHOW);
+}
+
+void ShowIdleDlg(IdleDialogData *data)
+{
+	if (hIdleDlg == NULL)
+		hIdleDlg = CreateDialogParam(hInst, MAKEINTRESOURCE(IDD_IDLE), NULL, IdleWndProc, (LPARAM) data);
+
+	SetForegroundWindow(hIdleDlg);
+	SetFocus(hIdleDlg);
+	ShowWindow(hIdleDlg, SW_SHOW);
+}
+
 
 int APIENTRY _tWinMain(HINSTANCE hInstance,
                      HINSTANCE hPrevInstance,
@@ -128,21 +144,26 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		addDefaultEntries();
 		recoverFromCrash();
 
-		hMain = CreateDialog(hInst, MAKEINTRESOURCE(IDD_MAIN), NULL, MainWndProc);
-		SetForegroundWindow(hMain);
-		SetFocus(hMain);
-		ShowWindow(hMain, SW_SHOW);
+		ShowMainDlg();
 
 		// Main message loop:
 		HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TIMELOG));
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0))
 		{
-			if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+			if (hIdleDlg != NULL && (hIdleDlg == msg.hwnd || IsChild(hIdleDlg, msg.hwnd)))
 			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
+				if (ProcessIdleMessage(hIdleDlg, &msg))
+					continue;
+				if (IsDialogMessage(hIdleDlg, &msg))
+					continue;
 			}
+
+			if (TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+				continue;
+
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
 		}
 
 		db.close();
@@ -160,76 +181,49 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 
 		return -1;
 	}
-
- 	// TODO: Place code here.
-/*	MSG msg;
-	HACCEL hAccelTable;
-
-	// Initialize global strings
-	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-	LoadString(hInstance, IDC_TIMELOG, szWindowClass, MAX_LOADSTRING);
-	MyRegisterClass(hInstance);
-
-	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
-	{
-		return FALSE;
-	}
-
-	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TIMELOG));
-
-	// Main message loop:
-	while (GetMessage(&msg, NULL, 0, 0))
-	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	}
-	return (int) msg.wParam;
-*/
 	return 0;
 }
 
 void LogStop(const Time &time)
 {
-	HWND ctrl = (HWND) GetDlgItem(hMain, IDC_OUT);
-	TCHAR tmp[1024];
-	GetWindowText(ctrl, tmp, 1024);
+	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
 	std::tstring str;
-	str = tmp;
-	str += time.task.name;
-	str += _T(" : Stopped working at ");
+	str = time.task.name;
+	str += _T(" : Stopped at ");
 
 	tm _tm;
 	localtime_s(&_tm, &time.end);
-	_tcsftime(tmp, 1024, _T("%c"), &_tm);
+
+	TCHAR tmp[128];
+	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
 	str += _T("\r\n");
 
-	SetWindowText(ctrl, str.c_str());
+	int ndx = GetWindowTextLength(ctrl);
+	SendMessage(ctrl, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
+	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) str.c_str());
 }
 
 void LogStart(const Time &time)
 {
-	HWND ctrl = (HWND) GetDlgItem(hMain, IDC_OUT);
-	TCHAR tmp[1024];
-	GetWindowText(ctrl, tmp, 1024);
+	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
 	std::tstring str;
-	str = tmp;
-	str += time.task.name;
-	str += _T(" : Started working at ");
+	str = time.task.name;
+	str += _T(" : Started at ");
 
 	tm _tm;
 	localtime_s(&_tm, &time.start);
-	_tcsftime(tmp, 1024, _T("%c"), &_tm);
+
+	TCHAR tmp[128];
+	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
 	str += _T("\r\n");
 
-	SetWindowText(ctrl, str.c_str());
+	int ndx = GetWindowTextLength(ctrl);
+	SendMessage(ctrl, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
+	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) str.c_str());
 }
 
 void ShowError(LPTSTR lpszFunction) 
@@ -276,19 +270,7 @@ void OnIdle(void *param, time_t time)
 	data->idleTime = time;
 	data->log = curTime;
 
-	HWND dlg = CreateDialogParam(hInst, MAKEINTRESOURCE(IDD_IDLE), NULL, IdleWndProc, (LPARAM) data);
-	if (dlg == NULL)
-	{
-		ShowError(_T("IdleDialog"));
-
-		LogStop(curTime);
-	}
-	else
-	{
-		SetForegroundWindow(dlg);
-		SetFocus(dlg);
- 		ShowWindow(dlg, SW_SHOW);
-	}
+	ShowIdleDlg(data);
 }
 
 void OnReturn(void *param, time_t time)
@@ -313,12 +295,12 @@ void appendLine(std::tstring &text, tm &date, int total)
 
 	TCHAR tmp[128];
 
-	text += _T("    ");
+//	text += _T("    ");
 	_tcsftime(tmp, 128, _T("%x"), &date);
 	text += tmp;
 	text += _T(" : ");
 
-	_sntprintf_s(tmp, 128, _T("%dh %dm %ds"), total / (60 * 60), (total / 60) % 60, total % 60);
+	_sntprintf_s(tmp, 128, _T("%dh %2dm %2ds"), total / (60 * 60), (total / 60) % 60, total % 60);
 	text += tmp;
 
 	text += _T("\r\n");
@@ -333,7 +315,7 @@ void appendWeekLine(std::tstring &text, tm &date, int total)
 
 	text += _T("        Week : ");
 
-	_sntprintf_s(tmp, 128, _T("%dh %dm %ds"), total / (60 * 60), (total / 60) % 60, total % 60);
+	_sntprintf_s(tmp, 128, _T("%dh %2dm %2ds"), total / (60 * 60), (total / 60) % 60, total % 60);
 	text += tmp;
 
 	text += _T("\r\n");
@@ -341,61 +323,49 @@ void appendWeekLine(std::tstring &text, tm &date, int total)
 
 void showLog(HWND ctrl)
 {
-	TCHAR tmp[1024];
-	GetWindowText(ctrl, tmp, 1024);
-
 	std::tstring text;
-	text = tmp;
+	text = _T("----- Time log -----\r\n\r\n");
 
-	text += _T("----- Time log -----\r\n\r\n");
-
-	std::vector<Task> tasks = Task::queryAll(&db, ANY(), _T("name ASC"));
-	for(size_t i = 0; i < tasks.size(); i++)
+	std::vector<Time> log = Time::queryAll(&db, ANY(), ANY(), ANY(), _T("start ASC")); 
+	tm last = {0};
+	int total = 0;
+	int weekTotal = 0;
+	for(size_t j = 0; j < log.size(); j++)
 	{
-		Task &task = tasks[i];
+		Time time = log[j];
 
-		text += task.name;
-		text += _T(":\r\n");
+		tm _tm;
+		localtime_s(&_tm, &time.start);
 
-		std::vector<Time> log = Time::queryAll(&db, task, ANY(), ANY(), _T("start ASC")); 
-		tm last = {0};
-		int total = 0;
-		int weekTotal = 0;
-		for(size_t j = 0; j < log.size(); j++)
+		if (last.tm_mday != _tm.tm_mday || last.tm_mon != _tm.tm_mon || last.tm_year != _tm.tm_year)
 		{
-			Time time = log[j];
+			appendLine(text, last, total);
 
-			tm _tm;
-			localtime_s(&_tm, &time.start);
-
-			if (last.tm_mday != _tm.tm_mday || last.tm_mon != _tm.tm_mon || last.tm_year != _tm.tm_year)
+			if (_tm.tm_wday < last.tm_wday || _tm.tm_mday >= last.tm_mday +7)
 			{
-				appendLine(text, last, total);
-
-				if (_tm.tm_wday < last.tm_wday || _tm.tm_mday >= last.tm_mday +7)
-				{
-					appendWeekLine(text, last, weekTotal);
-					weekTotal = 0;
-				}
-				
-				last = _tm;
-				total = 0;
+				appendWeekLine(text, last, weekTotal);
+				weekTotal = 0;
 			}
 			
-			int diff = (int) (time.end - time.start);
-			total += diff;
-			weekTotal += diff;
+			last = _tm;
+			total = 0;
 		}
-
-		appendLine(text, last, total);
-		appendWeekLine(text, last, weekTotal);
-
-
-		text += _T("\r\n");
+		
+		int diff = (int) (time.end - time.start);
+		total += diff;
+		weekTotal += diff;
 	}
+
+	appendLine(text, last, total);
+	appendWeekLine(text, last, weekTotal);
+
+
+	text += _T("\r\n");
 	text += _T("--------------------\r\n\r\n");
 
-	SetWindowText(ctrl, text.c_str());
+	int ndx = GetWindowTextLength(ctrl);
+	SendMessage(ctrl, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
+	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) text.c_str());
 }
 
 void showTodayWork(HWND ctrl)
@@ -429,9 +399,8 @@ void showTodayWork(HWND ctrl)
 	dt = GetTickCount() - dt;
 
 	TCHAR tmp[1024];
-	_sntprintf_s(tmp, 128, _T("Time worked today: %dh %dm"), total / (60 * 60), (total / 60) % 60);
+	_sntprintf_s(tmp, 128, _T("Time worked today: %dh %2dm"), total / (60 * 60), (total / 60) % 60);
 	SetWindowText(ctrl, tmp);
-
 }
 
 #define TIMER_CRASH 1
@@ -452,9 +421,9 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 			UserIdleHandler *uih = UserIdleHandler::getInstance();
 			
-			uih->setStopTimeMs(opts.stopTimeMs);
-			uih->setStartTimeMs(opts.startTimeMs);
-			uih->setIdleDuringStartTimeMs(opts.idleDuringStartTimeMs);
+			uih->setStopTimeMs(5000); //opts.stopTimeMs);
+			uih->setStartTimeMs(5000); //opts.startTimeMs);
+			uih->setIdleDuringStartTimeMs(4000); //opts.idleDuringStartTimeMs);
 			uih->setIsIdle(true);
 
 			uih->addOnIdleCallback(OnIdle);
@@ -476,11 +445,11 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				case WA_CLICKACTIVE:
 					showTodayWork(GetDlgItem(hWnd, IDC_TIME_TODAY));
 					SetTimer(hWnd, TIMER_WORK, 60 * 1000, NULL);
-					OutputDebugString(_T("WA_ACTIVE\n"));
+//					OutputDebugString(_T("WA_ACTIVE\n"));
 					break;
 				case WA_INACTIVE:
 					KillTimer(hWnd, TIMER_WORK);
-					OutputDebugString(_T("WA_INACTIVE\n"));
+//					OutputDebugString(_T("WA_INACTIVE\n"));
 					break;
 			}
 			break;
@@ -507,9 +476,18 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 		{
 			UserIdleHandler::getInstance()->stopTracking();
 
-			time_t now = 0;
-			time(&now);
-			OnIdle(GetDlgItem(hWnd, IDC_OUT), now);
+			if (opts.currentTime.id > 0)
+			{
+				time_t now = 0;
+				time(&now);
+
+				Time &curTime = opts.currentTime;
+				curTime.end = now;
+				curTime.store();
+
+				opts.currentTime.id = -1;
+				opts.store();
+			}
 
 			EndDialog(hWnd, 0);
 			return FALSE;
@@ -517,6 +495,7 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 		case WM_DESTROY:
 			PostQuitMessage(0);
+			hMainDlg = NULL;
 			break;
 	}
 	return FALSE;
@@ -637,8 +616,6 @@ void ActionSwitch(HWND hWnd, IdleDialogData *data)
 }
 
 
-
-
 INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
@@ -711,7 +688,7 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				{
 					IdleDialogData *data = (IdleDialogData *) GetWindowLong(hWnd, GWL_USERDATA);
 
-					ActionStop(NULL, data);
+					ActionIgnore(NULL, data);
 
 					DestroyWindow(hWnd);
 					break;
@@ -724,103 +701,22 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 		{
 			IdleDialogData *data = (IdleDialogData *) GetWindowLong(hWnd, GWL_USERDATA);
 
-			ActionStop(NULL, data);
+			ActionIgnore(NULL, data);
 
 			DestroyWindow(hWnd);
 			return FALSE;
 		}
 
 		case WM_DESTROY:
-			IdleDialogData *data = (IdleDialogData *) GetWindowLong(hWnd, GWL_USERDATA);
-			delete data;
+			delete (IdleDialogData *) GetWindowLong(hWnd, GWL_USERDATA);
+			hIdleDlg = NULL;
 			break;
 	}
+
 	return FALSE;
 }
 
-
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
-//  COMMENTS:
-//
-//    This function and its usage are only necessary if you want this code
-//    to be compatible with Win32 systems prior to the 'RegisterClassEx'
-//    function that was added to Windows 95. It is important to call this function
-//    so that the application will get 'well formed' small icons associated
-//    with it.
-//
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
-	WNDCLASSEX wcex;
-
-	wcex.cbSize = sizeof(WNDCLASSEX);
-
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= hInstance;
-	wcex.hIcon			= LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TIMELOG));
-	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName	= MAKEINTRESOURCE(IDC_TIMELOG);
-	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
-	return RegisterClassEx(&wcex);
-}
-
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-   HWND hWnd;
-
-   hInst = hInstance; // Store instance handle in our global variable
-
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
-
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   return TRUE;
-}
-
-//
-//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  PURPOSE:  Processes messages for the main window.
-//
-//  WM_COMMAND	- process the application menu
-//  WM_PAINT	- Paint the main window
-//  WM_DESTROY	- post a quit message and return
-//
-//
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	int wmId, wmEvent;
-	PAINTSTRUCT ps;
-	HDC hdc;
-
-	switch (message)
-	{
+/*
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
@@ -837,19 +733,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		break;
-	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
-		// TODO: Add any drawing code here...
-		EndPaint(hWnd, &ps);
-		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	}
-	return 0;
-}
+*/
 
 // Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -870,3 +754,243 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return (INT_PTR)FALSE;
 }
+
+
+
+BOOL IsRadioButton(HWND hwnd)
+{
+	BOOL    bRet;
+	UINT    code;
+
+	code = SendMessage(hwnd, WM_GETDLGCODE, 0, 0L);
+
+	if(code & DLGC_RADIOBUTTON)
+	{
+		/* Accept dlgCode claim. */
+		bRet = TRUE;
+	}
+	else
+	{
+		/* Otherwise has to be a button, and either radio-button
+		* or auto-radio-button.
+		*/
+		CHAR    szClass[7];
+		DWORD   style;
+
+		bRet =  GetClassNameA(hwnd, szClass, 7) &&
+			0 == lstrcmpiA(szClass, "BUTTON") && 
+			(   style = GetWindowLong(hwnd, GWL_STYLE),
+			(   (style  & 0x0F) == BS_RADIOBUTTON || 
+			style == BS_AUTORADIOBUTTON));
+	}
+
+	return  bRet;
+}
+
+BOOL IsRadioPeer(HWND hwnd1, HWND hwnd2)
+{
+	BOOL    bRet;
+
+	/* Must both be radio buttons, and siblings. */
+	if( !IsRadioButton(hwnd1) ||
+		!IsRadioButton(hwnd2) ||
+		GetParent(hwnd1) != GetParent(hwnd2))
+	{
+		bRet = FALSE;
+	}
+	else if(hwnd1 == hwnd2)
+	{
+		/* Same window, so peer by definition. */
+		bRet = TRUE;
+	}
+	else
+	{
+		/* Search forward, then backward, from hwnd1 to hwnd2, 
+		* looking for any non-radio peer, or any group marked, 
+		* between.
+		*/
+		HWND    hwndSearch;
+		int     i;
+		UINT    nDir;
+
+		for(bRet = FALSE, i = 0; i < 2; ++i)
+		{
+			nDir = i ? GW_HWNDPREV : GW_HWNDNEXT;
+
+			/* Iterate until arrive back at search, or no more
+			* windows.
+			*/
+			for(hwndSearch = GetWindow(hwnd1, nDir);
+				hwndSearch != NULL && hwndSearch != hwnd2;
+				hwndSearch = GetWindow(hwndSearch, nDir))
+			{
+				if(!IsRadioButton(hwndSearch))
+				{
+					/* Not a radio button, so stop searching */
+					break;
+				}
+
+				if(GetWindowLong(hwndSearch, GWL_STYLE) & WS_GROUP)
+				{
+					/* Begin of group, or start of next, so stop
+					* searching
+					*/
+					break;
+				}
+			}
+
+			if(hwndSearch == hwnd2)
+			{
+				/* The window that broke the search is our target,
+				* so they are indeed peers.
+				*/
+				bRet = TRUE;
+				break;
+			}
+		}
+	}
+
+	return bRet;
+}
+
+/* Goto the dialog control, handling radio button group members.
+* Return TRUE if the control is a radio button, FALSE otherwise.
+*/
+BOOL GotoDlgCtrlMaybeRadio(HWND hwndParent, HWND hwnd)
+{
+	BOOL    bIsRadio = IsRadioButton(hwnd);
+
+	if(bIsRadio)
+	{
+		/* Now find the button that is checked in the group. */
+		HWND    hwndSearch;
+		HWND    hwndFirst;
+		HWND    hwndAfter;
+
+		/* Find the first button in the group. */
+		for(hwndFirst = NULL, hwndSearch = hwnd;
+			hwndSearch != NULL;
+			hwndSearch = GetWindow(hwndSearch, GW_HWNDPREV))
+		{
+			if(IsRadioButton(hwndSearch))
+			{
+				hwndFirst = hwndSearch;
+			}
+		}
+
+		/* Find the last button in the group. */
+		for(hwndAfter = hwnd;
+			hwndAfter != NULL && IsRadioButton(hwndAfter);
+			hwndAfter = GetWindow(hwndAfter, GW_HWNDNEXT))
+		{}
+
+		/* Find the checked button within the group if any, 
+		* otherwise leave the selected control.
+		*/
+		for(hwndSearch = hwndFirst;
+			hwndSearch != NULL && hwndSearch != hwndAfter;
+			hwndSearch = GetWindow(hwndSearch, GW_HWNDNEXT))
+		{
+			if(SendMessage(hwndSearch, BM_GETCHECK, 0, 0L))
+			{
+				hwnd = hwndSearch;
+				break;
+			}
+		}
+	}
+
+	/* Set keyboard to the determined control. */
+	SendMessage(hwndParent, WM_NEXTDLGCTL, (WPARAM)hwnd, 1L);
+
+	return bIsRadio;
+}
+
+
+BOOL ProcessIdleMessage(HWND hWnd, MSG *msg)
+{
+	if (msg->message != WM_KEYDOWN)
+		return FALSE;
+	
+	switch(msg->wParam)
+	{
+		case VK_TAB:
+		{
+			// Check for SHIFT pressed
+			HWND  hwndFocus = msg->hwnd;
+			if (IsChild(GetDlgItem(hWnd, IDC_LOG_AND_BACK_TASK), hwndFocus))
+				hwndFocus = GetDlgItem(hWnd, IDC_LOG_AND_BACK_TASK);
+			else if (IsChild(GetDlgItem(hWnd, IDC_SWITCH_TASK), hwndFocus))
+				hwndFocus = GetDlgItem(hWnd, IDC_SWITCH_TASK);
+
+			UINT  idFocus   = GetDlgCtrlID(hwndFocus);
+			BOOL  bForward  = (GetKeyState(VK_SHIFT) & 0x8000) == 0;
+
+			if (bForward)
+			{
+				switch(idFocus)
+				{
+					case IDC_STOP:
+						SetFocus(GetDlgItem(hWnd, IDC_STOP_TIME));
+						return TRUE;
+					case IDC_STOP_TIME:
+						SetFocus(GetDlgItem(hWnd, IDOK));
+						return TRUE;
+					case IDC_IGNORE:
+						SetFocus(GetDlgItem(hWnd, IDOK));
+						return TRUE;
+					case IDC_LOG_AND_BACK:
+						SetFocus(GetDlgItem(hWnd, IDC_LOG_AND_BACK_TIME));
+						return TRUE;
+					case IDC_LOG_AND_BACK_TASK:
+						SetFocus(GetDlgItem(hWnd, IDOK));
+						return TRUE;
+					case IDC_SWITCH:
+						SetFocus(GetDlgItem(hWnd, IDC_SWITCH_TIME));
+						return TRUE;
+					case IDC_SWITCH_TASK:
+						SetFocus(GetDlgItem(hWnd, IDOK));
+						return TRUE;
+				}
+			}
+			else
+			{
+				switch(idFocus)
+				{
+					case IDC_STOP_TIME:
+						SetFocus(GetDlgItem(hWnd, IDC_STOP));
+						return TRUE;
+					case IDC_LOG_AND_BACK_TIME:
+						GotoDlgCtrlMaybeRadio(hWnd, GetDlgItem(hWnd, IDC_LOG_AND_BACK));
+						return TRUE;
+					case IDC_SWITCH_TIME:
+						GotoDlgCtrlMaybeRadio(hWnd, GetDlgItem(hWnd, IDC_SWITCH));
+						return TRUE;
+					case IDOK:
+						if (SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_GETCHECK, BST_CHECKED, 0) == BST_CHECKED)
+							SetFocus(GetDlgItem(hWnd, IDC_STOP_TIME));
+						else if (SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_GETCHECK, BST_CHECKED, 0) == BST_CHECKED)
+							GotoDlgCtrlMaybeRadio(hWnd, GetDlgItem(hWnd, IDC_IGNORE));
+						else if (SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_GETCHECK, BST_CHECKED, 0) == BST_CHECKED)
+							SetFocus(GetDlgItem(hWnd, IDC_LOG_AND_BACK_TASK));
+						else if (SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_GETCHECK, BST_CHECKED, 0) == BST_CHECKED)
+							SetFocus(GetDlgItem(hWnd, IDC_SWITCH_TASK));
+						return TRUE;
+				}
+			}
+			break;
+		}
+		case VK_ESCAPE:
+		{
+			SendMessage(hWnd, WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), (LPARAM) GetDlgItem(hWnd, IDCANCEL));
+			return TRUE;
+		}
+		case VK_RETURN:
+		{
+			SendMessage(hWnd, WM_COMMAND, MAKEWPARAM(IDOK, 0), (LPARAM) GetDlgItem(hWnd, IDOK));
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
