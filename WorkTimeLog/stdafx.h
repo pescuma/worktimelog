@@ -20,6 +20,7 @@
 
 
 // TODO: reference additional headers your program requires here
+#include "SystemTraySDK.h"
 #include "UserIdleHandler.h"
 #include "SQLite.h"
 #include "Task.h"
