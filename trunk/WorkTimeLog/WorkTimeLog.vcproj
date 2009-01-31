@@ -189,6 +189,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\SystemTraySDK.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Task.cpp"
 				>
 			</File>
@@ -228,6 +232,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\SystemTraySDK.h"
 				>
 			</File>
 			<File

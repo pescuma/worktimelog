@@ -4,6 +4,9 @@
 
 using namespace sqlite;
 
+
+#define	WM_TRAY_NOTIFY     (WM_APP+10)
+
 struct IdleDialogData
 {
 	time_t idleTime;
@@ -17,6 +20,7 @@ Database db;
 Options opts;
 HWND hMainDlg = NULL;
 HWND hIdleDlg = NULL;
+CSystemTray trayIcon;
 
 
 // Forward declarations of functions included in this code module:
@@ -97,14 +101,28 @@ void recoverFromCrash()
 */
 }
 
-void ShowMainDlg()
+void CreateMainDlg()
 {
 	if (hMainDlg == NULL)
 		hMainDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_MAIN), NULL, MainWndProc);
+}
 
+void ShowMainDlg()
+{
 	SetForegroundWindow(hMainDlg);
 	SetFocus(hMainDlg);
-	ShowWindow(hMainDlg, SW_SHOW);
+//	ShowWindow(hMainDlg, SW_SHOW);
+
+	if (!(GetWindowLong(hMainDlg, GWL_STYLE) & WS_VISIBLE))
+		CSystemTray::MaximiseFromTray(hMainDlg);
+}
+
+void HideMainDlg()
+{
+	if (GetWindowLong(hMainDlg, GWL_STYLE) & WS_VISIBLE)
+		CSystemTray::MinimiseToTray(hMainDlg);
+
+//	ShowWindow(hMainDlg, SW_HIDE);
 }
 
 void ShowIdleDlg(IdleDialogData *data)
@@ -144,7 +162,13 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		addDefaultEntries();
 		recoverFromCrash();
 
-		ShowMainDlg();
+		CreateMainDlg();
+
+		if (!trayIcon.Create(hInst, hMainDlg, WM_TRAY_NOTIFY,
+                     _T("Work Time Log"),
+                     LoadIcon(hInst, MAKEINTRESOURCE(IDI_TIMELOG)),
+                     IDR_POPUP_MENU)) 
+			return FALSE;
 
 		// Main message loop:
 		HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_TIMELOG));
@@ -184,7 +208,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	return 0;
 }
 
-void LogStop(const Time &time)
+void LogStop(const Time &time, BOOL lastOne)
 {
 	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
@@ -198,6 +222,10 @@ void LogStop(const Time &time)
 	TCHAR tmp[128];
 	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
+
+	if (lastOne)
+		trayIcon.ShowBalloon(str.c_str(), _T("Work Time Log"), NIIF_INFO);
+
 	str += _T("\r\n");
 
 	int ndx = GetWindowTextLength(ctrl);
@@ -205,7 +233,7 @@ void LogStop(const Time &time)
 	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) str.c_str());
 }
 
-void LogStart(const Time &time)
+void LogStart(const Time &time, BOOL lastOne)
 {
 	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
@@ -219,6 +247,10 @@ void LogStart(const Time &time)
 	TCHAR tmp[128];
 	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
+
+	if (lastOne)
+		trayIcon.ShowBalloon(str.c_str(), _T("Work Time Log"), NIIF_INFO);
+
 	str += _T("\r\n");
 
 	int ndx = GetWindowTextLength(ctrl);
@@ -285,7 +317,7 @@ void OnReturn(void *param, time_t time)
 	opts.currentTime = curTime;
 	opts.store();
 
-	LogStart(curTime);
+	LogStart(curTime, TRUE);
 }
 
 void appendLine(std::tstring &text, tm &date, int total)
@@ -438,8 +470,7 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 		case WM_ACTIVATE:
 		{
-			WORD what = LOWORD(wParam);
-			switch(what)
+			switch(LOWORD(wParam))
 			{
 				case WA_ACTIVE:
 				case WA_CLICKACTIVE:
@@ -450,6 +481,46 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				case WA_INACTIVE:
 					KillTimer(hWnd, TIMER_WORK);
 //					OutputDebugString(_T("WA_INACTIVE\n"));
+					break;
+			}
+			break;
+		}
+
+		case WM_SYSCOMMAND:
+			if (wParam != SC_MINIMIZE)
+				break;
+			
+			HideMainDlg();
+			return TRUE;
+
+		case WM_TRAY_NOTIFY:
+			return trayIcon.OnTrayNotification(wParam, lParam);
+
+		case WM_COMMAND:
+		{
+			int wmId    = LOWORD(wParam); 
+			int wmEvent = HIWORD(wParam); 
+
+			// Parse the menu selections:
+			switch (wmId)
+			{
+				case ID_POPUP_SHOW_HIDE:
+					if (GetWindowLong(hWnd, GWL_STYLE) & WS_VISIBLE)
+						HideMainDlg();
+					else
+						ShowMainDlg();
+					break; 
+				case IDM_ABOUT:
+				case ID_POPUP_ABOUT:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+					break;
+				case IDM_EXIT:
+				case ID_POPUP_EXIT:
+					SendMessage(hWnd, WM_CLOSE, 0, 0);
+					break;
+				case ID_FILE_OPTIONS:
+				case ID_POPUP_OPTIONS:
+					// TODO
 					break;
 			}
 			break;
@@ -528,7 +599,7 @@ void ActionStop(HWND hWnd, IdleDialogData *data)
 {
 	FixLogEndTime(hWnd, data, IDC_STOP_TIME);
 
-	LogStop(data->log);
+	LogStop(data->log, TRUE);
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(true);
@@ -570,7 +641,7 @@ void GetComboTask(Task &task, HWND hWnd, int combo)
 void ActionLogAndBack(HWND hWnd, IdleDialogData *data)
 {
 	FixLogEndTime(hWnd, data, IDC_LOG_AND_BACK_TIME);
-	LogStop(data->log);
+	LogStop(data->log, FALSE);
 
 	Task task;
 	GetComboTask(task, hWnd, IDC_LOG_AND_BACK_TASK);
@@ -582,8 +653,8 @@ void ActionLogAndBack(HWND hWnd, IdleDialogData *data)
 	other.end--;
 	other.store();
 
-	LogStart(other);
-	LogStop(other);
+	LogStart(other, FALSE);
+	LogStop(other, FALSE);
 
 	OnReturn(NULL, other.end + 1);
 
@@ -595,7 +666,7 @@ void ActionLogAndBack(HWND hWnd, IdleDialogData *data)
 void ActionSwitch(HWND hWnd, IdleDialogData *data)
 {
 	FixLogEndTime(hWnd, data, IDC_SWITCH_TIME);
-	LogStop(data->log);
+	LogStop(data->log, FALSE);
 
 	Task task;
 	GetComboTask(task, hWnd, IDC_SWITCH_TASK);
@@ -608,7 +679,7 @@ void ActionSwitch(HWND hWnd, IdleDialogData *data)
 	opts.currentTime = other;
 	opts.store();
 
-	LogStart(other);
+	LogStart(other, TRUE);
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(false);
@@ -716,43 +787,25 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	return FALSE;
 }
 
-/*
-	case WM_COMMAND:
-		wmId    = LOWORD(wParam);
-		wmEvent = HIWORD(wParam);
-		// Parse the menu selections:
-		switch (wmId)
-		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
-			break;
-		default:
-			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-		break;
-*/
 
 // Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
+		case WM_INITDIALOG:
+			SendMessage(GetDlgItem(hDlg, IDC_LOGO), STM_SETIMAGE, IMAGE_ICON, (LPARAM) LoadIcon(hInst, MAKEINTRESOURCE(IDI_TIMELOG)));
+			return TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+			{
+				EndDialog(hDlg, LOWORD(wParam));
+				return TRUE;
+			}
+			break;
 	}
-	return (INT_PTR)FALSE;
+	return FALSE;
 }
 
 
