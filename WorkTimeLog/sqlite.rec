@@ -18,7 +18,10 @@ struct Options
 	Time currentTime;
 	DateTime lastCheck;
 	
-	Int32 stopTimeMs;
-	Int32 startTimeMs;
-	Int32 idleDuringStartTimeMs;
+	Boolean autoTrack [default: true];
+	Int32 stopTimeMs [default: 600000];
+	Int32 startTimeMs [default: 5000];
+	Int32 idleDuringStartTimeMs [default: 1000];
+	
+	Boolean showBallons [default: true];
 };
