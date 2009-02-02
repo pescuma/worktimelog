@@ -26,3 +26,5 @@
 #include "Task.h"
 #include "Time.h"
 #include "Options.h"
+
+#define MAX_REGS(_A_) ( sizeof(_A_) / sizeof(_A_[0]) )

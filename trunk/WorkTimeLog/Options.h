@@ -21,9 +21,11 @@ public:
 	sqlite3_int64 id;
 	Time currentTime;
 	time_t lastCheck;
+	bool autoTrack;
 	int stopTimeMs;
 	int startTimeMs;
 	int idleDuringStartTimeMs;
+	bool showBallons;
 
 	Options(sqlite::Database *db, sqlite::Statement *stmt);
 	Options(sqlite::Database *db = NULL);
@@ -40,7 +42,7 @@ public:
 	
 	static Options query(sqlite::Database *db, sqlite3_int64 id);
 	static std::vector<Options> queryAll(sqlite::Database *db);
-	static std::vector<Options> queryAll(sqlite::Database *db, sqlite::Range<Time> currentTime = sqlite::ANY(), sqlite::Range<time_t> lastCheck = sqlite::ANY(), sqlite::Range<int> stopTimeMs = sqlite::ANY(), sqlite::Range<int> startTimeMs = sqlite::ANY(), sqlite::Range<int> idleDuringStartTimeMs = sqlite::ANY(), const TCHAR * orderBy = NULL);
+	static std::vector<Options> queryAll(sqlite::Database *db, sqlite::Range<Time> currentTime = sqlite::ANY(), sqlite::Range<time_t> lastCheck = sqlite::ANY(), sqlite::Range<bool> autoTrack = sqlite::ANY(), sqlite::Range<int> stopTimeMs = sqlite::ANY(), sqlite::Range<int> startTimeMs = sqlite::ANY(), sqlite::Range<int> idleDuringStartTimeMs = sqlite::ANY(), sqlite::Range<bool> showBallons = sqlite::ANY(), const TCHAR * orderBy = NULL);
 	
 	static void store(sqlite::Database *db, Options *obj);
 	static void remove(sqlite::Database *db, Options *obj);

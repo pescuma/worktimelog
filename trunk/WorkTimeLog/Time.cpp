@@ -63,19 +63,78 @@ void Time::createTable(sqlite::Database *db)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
-
-	db->execute(
-		_T("CREATE TABLE IF NOT EXISTS Time (")
-			_T("id INTEGER PRIMARY KEY, ")
-			_T("taskID INTEGER, ")
-			_T("start INTEGER, ")
-			_T("end INTEGER")
-		_T(")")
-	);
+	
+	sqlite::Transaction trans(db);
+	
+	std::tstring oldTable;
+	{
+		sqlite::Statement stmt = db->prepare(_T("SELECT sql FROM sqlite_master WHERE type == 'table' AND name = 'Time'"));
+		if (stmt.step())
+			stmt.getColumn(0, &oldTable);
+	}
+	
+	if (oldTable.length() > 0)
+	{
+		bool rebuild = false;
+		
+		if (oldTable.find(_T(", taskID ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", start ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", end ")) == (size_t) -1)
+			rebuild = true;
+		
+		if(rebuild)
+		{
+			db->execute(_T("ALTER TABLE Time RENAME TO TMP_OLD_Time"));
+			
+			db->execute(
+				_T("CREATE TABLE Time (")
+					_T("id INTEGER PRIMARY KEY, ")
+					_T("taskID INTEGER, ")
+					_T("start INTEGER NOT NULL DEFAULT 0, ")
+					_T("end INTEGER NOT NULL DEFAULT 0")
+				_T(")")
+			);
+			
+			std::tstring sql = _T("INSERT INTO Time(id");
+			if (oldTable.find(_T(", taskID ")) != (size_t) -1)
+				sql += _T(", taskID");
+			if (oldTable.find(_T(", start ")) != (size_t) -1)
+				sql += _T(", start");
+			if (oldTable.find(_T(", end ")) != (size_t) -1)
+				sql += _T(", end");
+			sql += _T(") SELECT id");
+			if (oldTable.find(_T(", taskID ")) != (size_t) -1)
+				sql += _T(", taskID");
+			if (oldTable.find(_T(", start ")) != (size_t) -1)
+				sql += _T(", start");
+			if (oldTable.find(_T(", end ")) != (size_t) -1)
+				sql += _T(", end");
+			sql += _T(" FROM TMP_OLD_Time");
+			
+			db->execute(sql.c_str());
+			
+			db->execute(_T("DROP TABLE TMP_OLD_Time"));
+		}
+	}
+	else
+	{
+		db->execute(
+			_T("CREATE TABLE IF NOT EXISTS Time (")
+				_T("id INTEGER PRIMARY KEY, ")
+				_T("taskID INTEGER, ")
+				_T("start INTEGER NOT NULL DEFAULT 0, ")
+				_T("end INTEGER NOT NULL DEFAULT 0")
+			_T(")")
+		);
+	}
 
 	db->execute(_T("CREATE INDEX IF NOT EXISTS INDEX_Time_start ON Time(start)"));
 
 	db->execute(_T("CREATE INDEX IF NOT EXISTS INDEX_Time_end ON Time(end)"));
+	
+	trans.commit();
 }
 
 

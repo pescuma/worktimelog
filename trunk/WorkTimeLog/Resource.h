@@ -15,6 +15,7 @@
 #define IDD_MAIN                        129
 #define IDD_IDLE                        130
 #define IDR_POPUP_MENU                  131
+#define IDD_OPTS                        132
 #define IDC_OUT                         1000
 #define IDC_STOP                        1001
 #define IDC_STOP_TIME                   1002
@@ -27,6 +28,15 @@
 #define IDC_SWITCH_TASK                 1009
 #define IDC_TIME_TODAY                  1010
 #define IDC_LOGO                        1011
+#define IDC_BALLONS                     1012
+#define IDC_AUTO_TRACK                  1013
+#define IDC_TIME_STOP                   1014
+#define IDC_TIME_STOP_SPIN              1015
+#define IDC_TIME_START                  1016
+#define IDC_TIME_START_SPIN             1017
+#define IDC_TIME_IDLE_IN_START          1018
+#define IDC_SPIN3                       1019
+#define IDC_TIME_IDLE_IN_START_SPIN     1019
 #define ID_POPUP_SHOW                   32771
 #define ID_POPUP_SHOW_HIDE              32772
 #define ID_POPUP_                       32773
@@ -41,9 +51,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        132
+#define _APS_NEXT_RESOURCE_VALUE        133
 #define _APS_NEXT_COMMAND_VALUE         32778
-#define _APS_NEXT_CONTROL_VALUE         1012
+#define _APS_NEXT_CONTROL_VALUE         1016
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

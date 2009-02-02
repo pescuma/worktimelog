@@ -19,7 +19,7 @@ Task::Task(sqlite::Database *db)
 	this->db = db;
 	
 	id = -1;
-	name = _T("");
+	name = _T('\0');
 }
 
 
@@ -56,13 +56,58 @@ void Task::createTable(sqlite::Database *db)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
-
-	db->execute(
-		_T("CREATE TABLE IF NOT EXISTS Task (")
-			_T("id INTEGER PRIMARY KEY, ")
-			_T("name VARCHAR")
-		_T(")")
-	);
+	
+	sqlite::Transaction trans(db);
+	
+	std::tstring oldTable;
+	{
+		sqlite::Statement stmt = db->prepare(_T("SELECT sql FROM sqlite_master WHERE type == 'table' AND name = 'Task'"));
+		if (stmt.step())
+			stmt.getColumn(0, &oldTable);
+	}
+	
+	if (oldTable.length() > 0)
+	{
+		bool rebuild = false;
+		
+		if (oldTable.find(_T(", name ")) == (size_t) -1)
+			rebuild = true;
+		
+		if(rebuild)
+		{
+			db->execute(_T("ALTER TABLE Task RENAME TO TMP_OLD_Task"));
+			
+			db->execute(
+				_T("CREATE TABLE Task (")
+					_T("id INTEGER PRIMARY KEY, ")
+					_T("name VARCHAR NOT NULL DEFAULT '\0'")
+				_T(")")
+			);
+			
+			std::tstring sql = _T("INSERT INTO Task(id");
+			if (oldTable.find(_T(", name ")) != (size_t) -1)
+				sql += _T(", name");
+			sql += _T(") SELECT id");
+			if (oldTable.find(_T(", name ")) != (size_t) -1)
+				sql += _T(", name");
+			sql += _T(" FROM TMP_OLD_Task");
+			
+			db->execute(sql.c_str());
+			
+			db->execute(_T("DROP TABLE TMP_OLD_Task"));
+		}
+	}
+	else
+	{
+		db->execute(
+			_T("CREATE TABLE IF NOT EXISTS Task (")
+				_T("id INTEGER PRIMARY KEY, ")
+				_T("name VARCHAR NOT NULL DEFAULT '\0'")
+			_T(")")
+		);
+	}
+	
+	trans.commit();
 }
 
 

@@ -16,9 +16,11 @@ Options::Options(sqlite::Database *db, sqlite::Statement *stmt) : currentTime(db
 	else
 		currentTime.id = -1;
 	lastCheck = (time_t) stmt->getColumnAsInt64(2);
-	stopTimeMs = stmt->getColumnAsInt(3);
-	startTimeMs = stmt->getColumnAsInt(4);
-	idleDuringStartTimeMs = stmt->getColumnAsInt(5);
+	autoTrack = (stmt->getColumnAsInt(3) != 0);
+	stopTimeMs = stmt->getColumnAsInt(4);
+	startTimeMs = stmt->getColumnAsInt(5);
+	idleDuringStartTimeMs = stmt->getColumnAsInt(6);
+	showBallons = (stmt->getColumnAsInt(7) != 0);
 }
 
 
@@ -28,9 +30,11 @@ Options::Options(sqlite::Database *db) : currentTime(db)
 	
 	id = -1;
 	lastCheck = 0;
-	stopTimeMs = 0;
-	startTimeMs = 0;
-	idleDuringStartTimeMs = 0;
+	autoTrack = true;
+	stopTimeMs = 600000;
+	startTimeMs = 5000;
+	idleDuringStartTimeMs = 1000;
+	showBallons = true;
 }
 
 
@@ -67,17 +71,106 @@ void Options::createTable(sqlite::Database *db)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
-
-	db->execute(
-		_T("CREATE TABLE IF NOT EXISTS Options (")
-			_T("id INTEGER PRIMARY KEY, ")
-			_T("currentTimeID INTEGER, ")
-			_T("lastCheck INTEGER, ")
-			_T("stopTimeMs INTEGER, ")
-			_T("startTimeMs INTEGER, ")
-			_T("idleDuringStartTimeMs INTEGER")
-		_T(")")
-	);
+	
+	sqlite::Transaction trans(db);
+	
+	std::tstring oldTable;
+	{
+		sqlite::Statement stmt = db->prepare(_T("SELECT sql FROM sqlite_master WHERE type == 'table' AND name = 'Options'"));
+		if (stmt.step())
+			stmt.getColumn(0, &oldTable);
+	}
+	
+	if (oldTable.length() > 0)
+	{
+		bool rebuild = false;
+		
+		if (oldTable.find(_T(", currentTimeID ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", lastCheck ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", autoTrack ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", stopTimeMs ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", startTimeMs ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", idleDuringStartTimeMs ")) == (size_t) -1)
+			rebuild = true;
+		else if (oldTable.find(_T(", showBallons ")) == (size_t) -1)
+			rebuild = true;
+		
+		if(rebuild)
+		{
+			db->execute(_T("ALTER TABLE Options RENAME TO TMP_OLD_Options"));
+			
+			db->execute(
+				_T("CREATE TABLE Options (")
+					_T("id INTEGER PRIMARY KEY, ")
+					_T("currentTimeID INTEGER, ")
+					_T("lastCheck INTEGER NOT NULL DEFAULT 0, ")
+					_T("autoTrack VARCHAR NOT NULL DEFAULT 1, ")
+					_T("stopTimeMs INTEGER NOT NULL DEFAULT 600000, ")
+					_T("startTimeMs INTEGER NOT NULL DEFAULT 5000, ")
+					_T("idleDuringStartTimeMs INTEGER NOT NULL DEFAULT 1000, ")
+					_T("showBallons VARCHAR NOT NULL DEFAULT 1")
+				_T(")")
+			);
+			
+			std::tstring sql = _T("INSERT INTO Options(id");
+			if (oldTable.find(_T(", currentTimeID ")) != (size_t) -1)
+				sql += _T(", currentTimeID");
+			if (oldTable.find(_T(", lastCheck ")) != (size_t) -1)
+				sql += _T(", lastCheck");
+			if (oldTable.find(_T(", autoTrack ")) != (size_t) -1)
+				sql += _T(", autoTrack");
+			if (oldTable.find(_T(", stopTimeMs ")) != (size_t) -1)
+				sql += _T(", stopTimeMs");
+			if (oldTable.find(_T(", startTimeMs ")) != (size_t) -1)
+				sql += _T(", startTimeMs");
+			if (oldTable.find(_T(", idleDuringStartTimeMs ")) != (size_t) -1)
+				sql += _T(", idleDuringStartTimeMs");
+			if (oldTable.find(_T(", showBallons ")) != (size_t) -1)
+				sql += _T(", showBallons");
+			sql += _T(") SELECT id");
+			if (oldTable.find(_T(", currentTimeID ")) != (size_t) -1)
+				sql += _T(", currentTimeID");
+			if (oldTable.find(_T(", lastCheck ")) != (size_t) -1)
+				sql += _T(", lastCheck");
+			if (oldTable.find(_T(", autoTrack ")) != (size_t) -1)
+				sql += _T(", autoTrack");
+			if (oldTable.find(_T(", stopTimeMs ")) != (size_t) -1)
+				sql += _T(", stopTimeMs");
+			if (oldTable.find(_T(", startTimeMs ")) != (size_t) -1)
+				sql += _T(", startTimeMs");
+			if (oldTable.find(_T(", idleDuringStartTimeMs ")) != (size_t) -1)
+				sql += _T(", idleDuringStartTimeMs");
+			if (oldTable.find(_T(", showBallons ")) != (size_t) -1)
+				sql += _T(", showBallons");
+			sql += _T(" FROM TMP_OLD_Options");
+			
+			db->execute(sql.c_str());
+			
+			db->execute(_T("DROP TABLE TMP_OLD_Options"));
+		}
+	}
+	else
+	{
+		db->execute(
+			_T("CREATE TABLE IF NOT EXISTS Options (")
+				_T("id INTEGER PRIMARY KEY, ")
+				_T("currentTimeID INTEGER, ")
+				_T("lastCheck INTEGER NOT NULL DEFAULT 0, ")
+				_T("autoTrack VARCHAR NOT NULL DEFAULT 1, ")
+				_T("stopTimeMs INTEGER NOT NULL DEFAULT 600000, ")
+				_T("startTimeMs INTEGER NOT NULL DEFAULT 5000, ")
+				_T("idleDuringStartTimeMs INTEGER NOT NULL DEFAULT 1000, ")
+				_T("showBallons VARCHAR NOT NULL DEFAULT 1")
+			_T(")")
+		);
+	}
+	
+	trans.commit();
 }
 
 
@@ -121,7 +214,7 @@ std::vector<Options> Options::queryAll(sqlite::Database *db)
 }
 
 
-std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time> pCurrentTime, sqlite::Range<time_t> pLastCheck, sqlite::Range<int> pStopTimeMs, sqlite::Range<int> pStartTimeMs, sqlite::Range<int> pIdleDuringStartTimeMs, const TCHAR *pOrderBy)
+std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time> pCurrentTime, sqlite::Range<time_t> pLastCheck, sqlite::Range<bool> pAutoTrack, sqlite::Range<int> pStopTimeMs, sqlite::Range<int> pStartTimeMs, sqlite::Range<int> pIdleDuringStartTimeMs, sqlite::Range<bool> pShowBallons, const TCHAR *pOrderBy)
 {
 	if (db == NULL)
 		throw sqlite::DatabaseException(SQLITE_ERROR, _T("Invalid database"));
@@ -164,6 +257,24 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time>
 				sql += _T("AND ");
 			if (pLastCheck.hasEnd())
 				sql += _T("lastCheck < ? ");
+		}
+		hasWhere = true;
+	}
+	if (!pAutoTrack.isNull())
+	{
+		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
+		if (pAutoTrack.isSingleValue())
+		{
+			sql += _T("autoTrack == ? ");
+		}
+		else
+		{
+			if (pAutoTrack.hasStart())
+				sql += _T("autoTrack >= ? ");
+			if (pAutoTrack.hasStart() && pAutoTrack.hasEnd())
+				sql += _T("AND ");
+			if (pAutoTrack.hasEnd())
+				sql += _T("autoTrack < ? ");
 		}
 		hasWhere = true;
 	}
@@ -221,6 +332,24 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time>
 		}
 		hasWhere = true;
 	}
+	if (!pShowBallons.isNull())
+	{
+		sql += ( hasWhere ? _T("AND ") : _T("WHERE ") );
+		if (pShowBallons.isSingleValue())
+		{
+			sql += _T("showBallons == ? ");
+		}
+		else
+		{
+			if (pShowBallons.hasStart())
+				sql += _T("showBallons >= ? ");
+			if (pShowBallons.hasStart() && pShowBallons.hasEnd())
+				sql += _T("AND ");
+			if (pShowBallons.hasEnd())
+				sql += _T("showBallons < ? ");
+		}
+		hasWhere = true;
+	}
 	
 	sql += _T("ORDER BY ");
 	if (pOrderBy == NULL)
@@ -245,6 +374,13 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time>
 		if (!pLastCheck.isSingleValue() && pLastCheck.hasEnd())
 			stmt.bind(bind++, (sqlite3_int64) pLastCheck.end());
 	}
+	if (!pAutoTrack.isNull())
+	{
+		if (pAutoTrack.hasStart())
+			stmt.bind(bind++, pAutoTrack.start() ? 1 : 0);
+		if (!pAutoTrack.isSingleValue() && pAutoTrack.hasEnd())
+			stmt.bind(bind++, pAutoTrack.end() ? 1 : 0);
+	}
 	if (!pStopTimeMs.isNull())
 	{
 		if (pStopTimeMs.hasStart())
@@ -266,6 +402,13 @@ std::vector<Options> Options::queryAll(sqlite::Database *db, sqlite::Range<Time>
 		if (!pIdleDuringStartTimeMs.isSingleValue() && pIdleDuringStartTimeMs.hasEnd())
 			stmt.bind(bind++, pIdleDuringStartTimeMs.end());
 	}
+	if (!pShowBallons.isNull())
+	{
+		if (pShowBallons.hasStart())
+			stmt.bind(bind++, pShowBallons.start() ? 1 : 0);
+		if (!pShowBallons.isSingleValue() && pShowBallons.hasEnd())
+			stmt.bind(bind++, pShowBallons.end() ? 1 : 0);
+	}
 	
 	while (stmt.step())
 		ret.push_back(Options(db, &stmt));
@@ -285,16 +428,18 @@ void Options::store(sqlite::Database *db, Options *obj)
 	sqlite3_int64 id;
 	
 	{
-		sqlite::Statement stmt = db->prepare(_T("INSERT OR REPLACE INTO Options VALUES (?, ?, ?, ?, ?, ?)"));
+		sqlite::Statement stmt = db->prepare(_T("INSERT OR REPLACE INTO Options VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
 
 		if (update)
 			stmt.bind(1, obj->id);
 		if (obj->currentTime.id > 0)
 			stmt.bind(2, obj->currentTime.id);
 		stmt.bind(3, (sqlite3_int64) obj->lastCheck);
-		stmt.bind(4, obj->stopTimeMs);
-		stmt.bind(5, obj->startTimeMs);
-		stmt.bind(6, obj->idleDuringStartTimeMs);
+		stmt.bind(4, obj->autoTrack ? 1 : 0);
+		stmt.bind(5, obj->stopTimeMs);
+		stmt.bind(6, obj->startTimeMs);
+		stmt.bind(7, obj->idleDuringStartTimeMs);
+		stmt.bind(8, obj->showBallons ? 1 : 0);
 
 		stmt.execute();
 

@@ -26,7 +26,8 @@ CSystemTray trayIcon;
 // Forward declarations of functions included in this code module:
 INT_PTR CALLBACK	MainWndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	IdleWndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	OptionsWndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	AboutWndProc(HWND, UINT, WPARAM, LPARAM);
 
 BOOL ProcessIdleMessage(HWND hWnd, MSG *msg);
 
@@ -212,50 +213,55 @@ void LogStop(const Time &time, BOOL lastOne)
 {
 	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
+	tm _tm;
+	localtime_s(&_tm, &time.end);
+	TCHAR tmp[128];
+	_tcsftime(tmp, 128, _T("%c"), &_tm);
+
 	std::tstring str;
 	str = time.task.name;
 	str += _T(" : Stopped at ");
-
-	tm _tm;
-	localtime_s(&_tm, &time.end);
-
-	TCHAR tmp[128];
-	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
-
-	if (lastOne)
-		trayIcon.ShowBalloon(str.c_str(), _T("Work Time Log"), NIIF_INFO);
-
 	str += _T("\r\n");
 
 	int ndx = GetWindowTextLength(ctrl);
 	SendMessage(ctrl, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
 	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) str.c_str());
+	
+	if (lastOne && opts.showBallons)
+	{
+		str = time.task.name;
+		str += _T(" : Stopped");
+		trayIcon.ShowBalloon(tmp, str.c_str(), NIIF_INFO);
+	}
 }
 
 void LogStart(const Time &time, BOOL lastOne)
 {
 	HWND ctrl = (HWND) GetDlgItem(hMainDlg, IDC_OUT);
 
+	tm _tm;
+	localtime_s(&_tm, &time.start);
+	TCHAR tmp[128];
+	_tcsftime(tmp, 128, _T("%c"), &_tm);
+
 	std::tstring str;
 	str = time.task.name;
 	str += _T(" : Started at ");
-
-	tm _tm;
-	localtime_s(&_tm, &time.start);
-
-	TCHAR tmp[128];
-	_tcsftime(tmp, 128, _T("%c"), &_tm);
 	str += tmp;
-
-	if (lastOne)
-		trayIcon.ShowBalloon(str.c_str(), _T("Work Time Log"), NIIF_INFO);
-
 	str += _T("\r\n");
 
 	int ndx = GetWindowTextLength(ctrl);
 	SendMessage(ctrl, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
 	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) str.c_str());
+
+	if (lastOne && opts.showBallons)
+	{
+		str = time.task.name;
+		str += _T(" : Started");
+
+		trayIcon.ShowBalloon(tmp, str.c_str(), NIIF_INFO);
+	}
 }
 
 void ShowError(LPTSTR lpszFunction) 
@@ -461,7 +467,8 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			uih->addOnIdleCallback(OnIdle);
 			uih->addOnReturnCallback(OnReturn);
 
-			uih->startTracking();
+			if (opts.autoTrack)
+				uih->startTracking();
 
 			SetTimer(hWnd, TIMER_CRASH, 5 * 60 * 1000, NULL);
 
@@ -512,7 +519,7 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 					break; 
 				case IDM_ABOUT:
 				case ID_POPUP_ABOUT:
-					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, AboutWndProc);
 					break;
 				case IDM_EXIT:
 				case ID_POPUP_EXIT:
@@ -520,7 +527,7 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 					break;
 				case ID_FILE_OPTIONS:
 				case ID_POPUP_OPTIONS:
-					// TODO
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_OPTS), hWnd, OptionsWndProc);
 					break;
 			}
 			break;
@@ -603,7 +610,8 @@ void ActionStop(HWND hWnd, IdleDialogData *data)
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(true);
-	uih->startTracking();
+	if (opts.autoTrack)
+		uih->startTracking();
 }
 
 void ActionIgnore(HWND hWnd, IdleDialogData *data)
@@ -613,7 +621,8 @@ void ActionIgnore(HWND hWnd, IdleDialogData *data)
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(false);
-	uih->startTracking();
+	if (opts.autoTrack)
+		uih->startTracking();
 }
 
 void GetComboTask(Task &task, HWND hWnd, int combo)
@@ -660,7 +669,8 @@ void ActionLogAndBack(HWND hWnd, IdleDialogData *data)
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(false);
-	uih->startTracking();
+	if (opts.autoTrack)
+		uih->startTracking();
 }
 
 void ActionSwitch(HWND hWnd, IdleDialogData *data)
@@ -683,7 +693,8 @@ void ActionSwitch(HWND hWnd, IdleDialogData *data)
 
 	UserIdleHandler *uih = UserIdleHandler::getInstance();
 	uih->setIsIdle(false);
-	uih->startTracking();
+	if (opts.autoTrack)
+		uih->startTracking();
 }
 
 
@@ -789,7 +800,7 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 
 // Message handler for about box.
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK AboutWndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
@@ -1047,3 +1058,78 @@ BOOL ProcessIdleMessage(HWND hWnd, MSG *msg)
 	return FALSE;
 }
 
+
+INT_PTR CALLBACK OptionsWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+		case WM_INITDIALOG:
+		{
+			HICON hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_TIMELOG));
+			SendMessage(hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
+			SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
+
+			CheckDlgButton(hWnd, IDC_BALLONS, opts.showBallons ? BST_CHECKED : BST_UNCHECKED);
+
+			CheckDlgButton(hWnd, IDC_AUTO_TRACK, opts.autoTrack ? BST_CHECKED : BST_UNCHECKED);
+
+			SendDlgItemMessage(hWnd, IDC_TIME_STOP_SPIN, UDM_SETBUDDY, (WPARAM) GetDlgItem(hWnd, IDC_TIME_STOP),0);
+			SendDlgItemMessage(hWnd, IDC_TIME_STOP_SPIN, UDM_SETRANGE, 0, MAKELONG(1, 24 * 60 * 60));
+			SendDlgItemMessage(hWnd, IDC_TIME_STOP_SPIN, UDM_SETPOS, 0, MAKELONG(opts.stopTimeMs / 1000, 0));
+
+			SendDlgItemMessage(hWnd, IDC_TIME_START_SPIN, UDM_SETBUDDY, (WPARAM) GetDlgItem(hWnd, IDC_TIME_START),0);
+			SendDlgItemMessage(hWnd, IDC_TIME_START_SPIN, UDM_SETRANGE, 0, MAKELONG(1, 24 * 60 * 60));
+			SendDlgItemMessage(hWnd, IDC_TIME_START_SPIN, UDM_SETPOS, 0, MAKELONG(opts.startTimeMs / 1000, 0));
+
+			SendDlgItemMessage(hWnd, IDC_TIME_IDLE_IN_START_SPIN, UDM_SETBUDDY, (WPARAM) GetDlgItem(hWnd, IDC_TIME_IDLE_IN_START),0);
+			SendDlgItemMessage(hWnd, IDC_TIME_IDLE_IN_START_SPIN, UDM_SETRANGE, 0, MAKELONG(1, 24 * 60 * 60 * 1000));
+			SendDlgItemMessage(hWnd, IDC_TIME_IDLE_IN_START_SPIN, UDM_SETPOS, 0, MAKELONG(opts.idleDuringStartTimeMs, 0));
+
+			return TRUE;
+		}
+
+		case WM_COMMAND:
+		{
+			switch (LOWORD(wParam))
+			{
+				case IDOK:
+				{
+					opts.showBallons = (IsDlgButtonChecked(hWnd, IDC_BALLONS) != 0);
+
+					bool oldTrack = opts.autoTrack;
+					opts.autoTrack = (IsDlgButtonChecked(hWnd, IDC_AUTO_TRACK) != 0);
+					opts.stopTimeMs = SendDlgItemMessage(hWnd, IDC_TIME_STOP_SPIN, UDM_GETPOS, 0, 0) * 1000;
+					opts.startTimeMs = SendDlgItemMessage(hWnd, IDC_TIME_START_SPIN, UDM_GETPOS, 0, 0) * 1000;
+					opts.idleDuringStartTimeMs = SendDlgItemMessage(hWnd, IDC_TIME_IDLE_IN_START_SPIN, UDM_GETPOS, 0, 0);
+
+					opts.store();
+
+					if (oldTrack != opts.autoTrack)
+					{
+						UserIdleHandler *uih = UserIdleHandler::getInstance();
+
+						if (!opts.autoTrack)
+						{
+							uih->stopTracking();
+						}
+						else
+						{
+							uih->setIsIdle(opts.currentTime.id <= 0);
+							uih->startTracking();
+						}
+					}
+
+					EndDialog(hWnd, LOWORD(wParam));
+					return TRUE;
+				}
+
+				case IDCANCEL:
+					EndDialog(hWnd, LOWORD(wParam));
+					return TRUE;
+			}
+			break;
+		}
+	}
+
+	return FALSE;
+}
