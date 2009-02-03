@@ -139,14 +139,6 @@ void UserIdleHandler::onTimer()
 
 	unsigned int inputTime = max(lpi.dwTime, lastStateChangeTime);
 	unsigned int now = GetTickCount();
-	time_t inputTS = 0;
-	time(&inputTS);
-	inputTS -= (now - inputTime) / 1000;
-
-	//TCHAR tmp[1024];
-	//_sntprintf_s(tmp, 1024, _T("[%d | %d | %d | %d] %s %d\n"), 
-	//	now, inputTime, now - inputTime, lastStateChangeTime, _T("Check"), state);
-	//OutputDebugString(tmp);
 
 	switch(state)
 	{
@@ -156,10 +148,7 @@ void UserIdleHandler::onTimer()
 			if (inputTime > lastStateChangeTime)
 			{
 				state = TRYING_TO_USE;
-				lastStateChangeTime = now;
-
-				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("IDLE -> TRYING_TO_USE"));
-				//OutputDebugString(tmp);
+				lastStateChangeTime = inputTime;
 			}
 			break;
 		}
@@ -169,19 +158,17 @@ void UserIdleHandler::onTimer()
 			{
 				state = IDLE;
 				lastStateChangeTime = now;
-
-				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> IDLE"));
-				//OutputDebugString(tmp);
 			}
 			else if (now - lastStateChangeTime > startTimeMs)
 			{
+				time_t ts = 0;
+				time(&ts);
+				ts -= (now - lastStateChangeTime) / 1000;
+
 				state = USING;
 				lastStateChangeTime = now;
 
-				onReturn(inputTS);
-
-				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("TRYING_TO_USE -> USING"));
-				//OutputDebugString(tmp);
+				onReturn(ts);
 			}
 			break;
 		}
@@ -189,13 +176,14 @@ void UserIdleHandler::onTimer()
 		{
 			if (now - inputTime > stopTimeMs)
 			{
+				time_t ts = 0;
+				time(&ts);
+				ts -= (now - inputTime) / 1000;
+
 				state = IDLE;
 				lastStateChangeTime = now;
 
-				onIdle(inputTS);
-
-				//_sntprintf_s(tmp, 1024, _T("[%d] %s\n"), now, _T("USING -> IDLE"));
-				//OutputDebugString(tmp);
+				onIdle(ts);
 			}
 			break;
 		}

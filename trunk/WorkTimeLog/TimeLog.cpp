@@ -197,7 +197,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	}
 	catch(DatabaseException ex) 
 	{
-		MessageBox(NULL, ex.message, _T("TimeLog - DB Error"), MB_OK | MB_ICONERROR);
+		MessageBox(NULL, ex.message, _T("DB Error - Work Time Log"), MB_OK | MB_ICONERROR);
 
 		OutputDebugString(_T("------------------------\n"));
 		OutputDebugString(_T("DB error\n"));
@@ -406,10 +406,8 @@ void showLog(HWND ctrl)
 	SendMessage(ctrl, EM_REPLACESEL, 0, (LPARAM) text.c_str());
 }
 
-void showTodayWork(HWND ctrl)
+int calcTodayWork()
 {
-	DWORD dt = GetTickCount();
-
 	time_t ltime;
 	time(&ltime);
 
@@ -434,15 +432,22 @@ void showTodayWork(HWND ctrl)
 	if (opts.currentTime.id > 0)
 		total += (int) (ltime - opts.currentTime.start);
 
-	dt = GetTickCount() - dt;
+	return total;
+}
+
+
+void showTodayWork(HWND ctrl)
+{
+	int total = calcTodayWork();
 
 	TCHAR tmp[1024];
-	_sntprintf_s(tmp, 128, _T("Time worked today: %2dh %2dm"), total / (60 * 60), (total / 60) % 60);
+	_sntprintf_s(tmp, MAX_REGS(tmp), _T("Time worked today: %2dh %2dm"), total / (60 * 60), (total / 60) % 60);
 	SetWindowText(ctrl, tmp);
 }
 
 #define TIMER_CRASH 1
 #define TIMER_WORK 2
+#define TIMER_LCLICK 3
 
 
 INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -483,11 +488,9 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				case WA_CLICKACTIVE:
 					showTodayWork(GetDlgItem(hWnd, IDC_TIME_TODAY));
 					SetTimer(hWnd, TIMER_WORK, 60 * 1000, NULL);
-//					OutputDebugString(_T("WA_ACTIVE\n"));
 					break;
 				case WA_INACTIVE:
 					KillTimer(hWnd, TIMER_WORK);
-//					OutputDebugString(_T("WA_INACTIVE\n"));
 					break;
 			}
 			break;
@@ -501,7 +504,21 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			return TRUE;
 
 		case WM_TRAY_NOTIFY:
-			return trayIcon.OnTrayNotification(wParam, lParam);
+		    if (wParam == IDR_POPUP_MENU)
+			{
+				switch(LOWORD(lParam))
+				{
+					case WM_LBUTTONDOWN:
+						SetTimer(hWnd, TIMER_LCLICK, GetDoubleClickTime() + 100, NULL);
+						break;
+					case WM_LBUTTONDBLCLK:
+						KillTimer(hWnd, TIMER_LCLICK);
+						break;
+				}
+
+				return trayIcon.OnTrayNotification(wParam, lParam);
+			}
+			break;
 
 		case WM_COMMAND:
 		{
@@ -546,6 +563,25 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			else if (wParam == TIMER_WORK)
 			{
 				showTodayWork(GetDlgItem(hWnd, IDC_TIME_TODAY));
+			}
+			else if (wParam == TIMER_LCLICK)
+			{
+				KillTimer(hWnd, TIMER_LCLICK);
+
+				std::tstring title;
+				if (opts.currentTime.id > 0)
+				{
+					title = opts.currentTime.task.name;
+					title += _T(" : Counting");
+				}
+				else
+					title = _T("Idle");
+
+				int total = calcTodayWork();
+				TCHAR text[1024];
+				_sntprintf_s(text, MAX_REGS(text), _T("Time worked today: %2dh %2dm"), total / (60 * 60), (total / 60) % 60);
+
+				trayIcon.ShowBalloon(text, title.c_str(), NIIF_INFO);
 			}
 			break;
 		}
@@ -718,7 +754,7 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			localtime_s(&_tm, &data->idleTime);
 
 			SYSTEMTIME st = {0};
-			st.wYear = _tm.tm_year;
+			st.wYear = _tm.tm_year + 1900;
 			st.wMonth = _tm.tm_mon;
 			st.wDayOfWeek = _tm.tm_wday;
 			st.wDay = _tm.tm_mday;

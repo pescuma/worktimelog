@@ -45,7 +45,7 @@ IDC_TIMELOG MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "&Options",                    ID_FILE_OPTIONS
+        MENUITEM "&Options...",                 ID_FILE_OPTIONS
         MENUITEM "E&xit",                       IDM_EXIT
     END
     POPUP "&Help"
@@ -85,16 +85,16 @@ END
 // Dialog
 //
 
-IDD_ABOUTBOX DIALOGEX 0, 0, 214, 94
+IDD_ABOUTBOX DIALOGEX 0, 0, 214, 102
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "About Work Time Log"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
-    ICON            128,IDC_LOGO,14,14,20,20
-    LTEXT           "Work Time Log, Version 0.0.0.5",IDC_STATIC,42,14,163,8,SS_NOPREFIX
-    LTEXT           "Copyright (C) 2009 - Ricardo Pescuma Domenecci",IDC_STATIC,42,26,162,8
-    DEFPUSHBUTTON   "OK",IDOK,157,73,50,14,WS_GROUP
-    LTEXT           "Thanks:\n   Júlio Reis for the icon\n   Chris Maunder for the systray class",IDC_STATIC,7,42,200,26
+    ICON            128,IDC_LOGO,14,14,21,20
+    LTEXT           "Work Time Log, Version 0.0.0.6",IDC_STATIC,42,14,163,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2009 - Ricardo Pescuma Domenecci",IDC_STATIC,42,29,163,8
+    DEFPUSHBUTTON   "OK",IDOK,157,81,50,14,WS_GROUP
+    LTEXT           "Thanks:\n   Júlio Reis for the icon\n   Chris Maunder for the systray class",IDC_STATIC,42,44,163,26
 END
 
 IDD_MAIN DIALOGEX 0, 0, 316, 218
@@ -109,7 +109,7 @@ END
 
 IDD_IDLE DIALOGEX 0, 0, 332, 214
 STYLE DS_SETFONT | DS_MODALFRAME | DS_SETFOREGROUND | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-EXSTYLE WS_EX_TOPMOST | WS_EX_CONTROLPARENT | WS_EX_APPWINDOW
+EXSTYLE WS_EX_CONTROLPARENT | WS_EX_APPWINDOW
 CAPTION "Idle time detected - Work Time Log"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
@@ -171,7 +171,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 207
         TOPMARGIN, 7
-        BOTTOMMARGIN, 87
+        BOTTOMMARGIN, 95
     END
 
     IDD_MAIN, DIALOG
@@ -238,8 +238,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,0,0,5
- PRODUCTVERSION 0,0,0,5
+ FILEVERSION 0,0,0,6
+ PRODUCTVERSION 0,0,0,6
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -255,12 +255,12 @@ BEGIN
         BLOCK "041604b0"
         BEGIN
             VALUE "FileDescription", "Work Time Log"
-            VALUE "FileVersion", "0, 0, 0, 5"
+            VALUE "FileVersion", "0, 0, 0, 6"
             VALUE "InternalName", "WorkTimeLog"
             VALUE "LegalCopyright", "Copyright (C) 2009 - Ricardo Pescuma Domenecci"
             VALUE "OriginalFilename", "WorkTimeLog.exe"
             VALUE "ProductName", "Work Time Log"
-            VALUE "ProductVersion", "0, 0, 0, 5"
+            VALUE "ProductVersion", "0, 0, 0, 6"
         END
     END
     BLOCK "VarFileInfo"
