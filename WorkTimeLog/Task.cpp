@@ -19,7 +19,7 @@ Task::Task(sqlite::Database *db)
 	this->db = db;
 	
 	id = -1;
-	name = _T('\0');
+	name = _T('');
 }
 
 
@@ -80,7 +80,7 @@ void Task::createTable(sqlite::Database *db)
 			db->execute(
 				_T("CREATE TABLE Task (")
 					_T("id INTEGER PRIMARY KEY, ")
-					_T("name VARCHAR NOT NULL DEFAULT '\0'")
+					_T("name VARCHAR")
 				_T(")")
 			);
 			
@@ -102,7 +102,7 @@ void Task::createTable(sqlite::Database *db)
 		db->execute(
 			_T("CREATE TABLE IF NOT EXISTS Task (")
 				_T("id INTEGER PRIMARY KEY, ")
-				_T("name VARCHAR NOT NULL DEFAULT '\0'")
+				_T("name VARCHAR")
 			_T(")")
 		);
 	}

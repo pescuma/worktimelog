@@ -28,17 +28,35 @@ UserIdleHandler::UserIdleHandler()
 
 void UserIdleHandler::setStartTimeMs(unsigned int startTimeMs)
 {
+	if (this->startTimeMs == startTimeMs)
+		return;
+
 	this->startTimeMs = startTimeMs;
+
+	if (tracking)
+		startTimer();
 }
 
 void UserIdleHandler::setIdleDuringStartTimeMs(unsigned int idleDuringStartTimeMs)
 {
+	if (this->idleDuringStartTimeMs == idleDuringStartTimeMs)
+		return;
+
 	this->idleDuringStartTimeMs = idleDuringStartTimeMs;
+
+	if (tracking)
+		startTimer();
 }
 
 void UserIdleHandler::setStopTimeMs(unsigned int stopTimeMs)
 {
+	if (this->stopTimeMs == stopTimeMs)
+		return;
+
 	this->stopTimeMs = stopTimeMs;
+
+	if (tracking)
+		startTimer();
 }
 
 void UserIdleHandler::setIsIdle(bool isIdle)
@@ -49,6 +67,9 @@ void UserIdleHandler::setIsIdle(bool isIdle)
 		state = USING;
 	
 	lastStateChangeTime = GetTickCount();
+
+	if (tracking)
+		startTimer();
 }
 
 void UserIdleHandler::addOnIdleCallback(UserIdleHandlerCallback cb, void *param)

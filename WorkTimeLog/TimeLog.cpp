@@ -509,11 +509,23 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				switch(LOWORD(lParam))
 				{
 					case WM_LBUTTONDOWN:
+					{
+//						TCHAR tmp[128];
+//						_sntprintf_s(tmp, 128, _T("WM_LBUTTONDOWN SetTimer %d\n"), GetDoubleClickTime());
+//						MessageBox(NULL, tmp, _T("WTL"), MB_OK);
+
 						SetTimer(hWnd, TIMER_LCLICK, GetDoubleClickTime() + 100, NULL);
 						break;
+					}
 					case WM_LBUTTONDBLCLK:
+					{
+//						TCHAR tmp[128];
+//						_sntprintf_s(tmp, 128, _T("WM_LBUTTONDBLCLK KillTimer\n"));
+//						MessageBox(NULL, tmp, _T("WTL"), MB_OK);
+
 						KillTimer(hWnd, TIMER_LCLICK);
 						break;
+					}
 				}
 
 				return trayIcon.OnTrayNotification(wParam, lParam);
@@ -567,6 +579,10 @@ INT_PTR CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			else if (wParam == TIMER_LCLICK)
 			{
 				KillTimer(hWnd, TIMER_LCLICK);
+
+//				TCHAR tmp[128];
+//				_sntprintf_s(tmp, 128, _T("TIMER_LCLICK KillTimer\n"));
+//				MessageBox(NULL, tmp, _T("WTL"), MB_OK);
 
 				std::tstring title;
 				if (opts.currentTime.id > 0)
@@ -748,8 +764,6 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
 			SetWindowLong(hWnd, GWL_USERDATA, (LONG) data);
 
-			SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_CHECKED, 0);  
-
 			tm _tm;
 			localtime_s(&_tm, &data->idleTime);
 
@@ -774,13 +788,46 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 				SendMessage(GetDlgItem(hWnd, IDC_SWITCH_TASK), CB_ADDSTRING, 0, (LPARAM) name);
 			}
 
+			SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_CHECKED, 0);
+
 			SetFocus(GetDlgItem(hWnd, IDC_STOP));
 
 			return TRUE;
 		}
 
+		case WM_NOTIFY:
+		{
+			NMHDR *nmhdr = (NMHDR *) lParam;
+			if (nmhdr->code == DTN_DATETIMECHANGE)
+			{
+				switch(nmhdr->idFrom)
+				{
+					case IDC_LOG_AND_BACK_TIME:
+						SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_SETCHECK, BST_CHECKED, 0);  
+						break;
+					case IDC_SWITCH_TIME:
+						SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_SETCHECK, BST_CHECKED, 0);  
+						break;
+					case IDC_STOP_TIME:
+						SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_SETCHECK, BST_UNCHECKED, 0);  
+						SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_CHECKED, 0);  
+				}
+			}
+
+			break;
+		}
+
 		case WM_COMMAND:
 		{
+			int x = HIWORD(wParam);
 			switch(LOWORD(wParam))
 			{
 				case IDOK:
@@ -809,6 +856,28 @@ INT_PTR CALLBACK IdleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 					ActionIgnore(NULL, data);
 
 					DestroyWindow(hWnd);
+					break;
+				}
+				case IDC_LOG_AND_BACK_TASK:
+				{
+					if (HIWORD(wParam) != CBN_EDITCHANGE && HIWORD(wParam) != CBN_SELCHANGE)
+						break;
+
+					SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_SETCHECK, BST_CHECKED, 0);  
+					break;
+				}
+				case IDC_SWITCH_TASK:
+				{
+					if (HIWORD(wParam) != CBN_EDITCHANGE && HIWORD(wParam) != CBN_SELCHANGE)
+						break;
+
+					SendMessage(GetDlgItem(hWnd, IDC_STOP), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_IGNORE), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_LOG_AND_BACK), BM_SETCHECK, BST_UNCHECKED, 0);  
+					SendMessage(GetDlgItem(hWnd, IDC_SWITCH), BM_SETCHECK, BST_CHECKED, 0);  
 					break;
 				}
 			}
@@ -1140,10 +1209,14 @@ INT_PTR CALLBACK OptionsWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
 					opts.store();
 
+					UserIdleHandler *uih = UserIdleHandler::getInstance();
+
+					uih->setStopTimeMs(opts.stopTimeMs);
+					uih->setStartTimeMs(opts.startTimeMs);
+					uih->setIdleDuringStartTimeMs(opts.idleDuringStartTimeMs);
+
 					if (oldTrack != opts.autoTrack)
 					{
-						UserIdleHandler *uih = UserIdleHandler::getInstance();
-
 						if (!opts.autoTrack)
 						{
 							uih->stopTracking();

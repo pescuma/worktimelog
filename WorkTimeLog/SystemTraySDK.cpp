@@ -48,9 +48,22 @@ static char THIS_FILE[]=__FILE__;
 CSystemTray* CSystemTray::m_pThis = NULL;
 
 const UINT CSystemTray::m_nTimerID    = 4567;
-UINT CSystemTray::m_nMaxTooltipLength  = 64;     // This may change...
 const UINT CSystemTray::m_nTaskbarCreatedMsg = ::RegisterWindowMessage(_T("TaskbarCreated"));
 HWND  CSystemTray::m_hWndInvisible;
+
+
+static void copy(TCHAR *dest, const TCHAR *src, size_t destSize)
+{
+	if (src == NULL)
+	{
+		dest[0] = 0;
+		return;
+	}
+	lstrcpyn(dest, src, destSize);
+}
+
+#define COPY(_DEST_, _SRC_) copy(_DEST_, _SRC_, _countof(_DEST_))
+
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -150,13 +163,8 @@ BOOL CSystemTray::Create(HINSTANCE hInst, HWND hParent, UINT uCallbackMessage,
     }
 #endif
    
-    m_nMaxTooltipLength = _countof(m_tnd.szTip);
-    
     // Make sure we avoid conflict with other messages
     ASSERT(uCallbackMessage >= WM_APP);
-
-    // Tray only supports tooltip text up to m_nMaxTooltipLength) characters
-    ASSERT(_tcslen(szToolTip) <= m_nMaxTooltipLength);
 
     m_hInstance = hInst;
 
@@ -170,31 +178,18 @@ BOOL CSystemTray::Create(HINSTANCE hInst, HWND hParent, UINT uCallbackMessage,
                             hInst, 0);
 
     // load up the NOTIFYICONDATA structure
-    m_tnd.cbSize = sizeof(NOTIFYICONDATA);
+    m_tnd.cbSize = sizeof(m_tnd);
     m_tnd.hWnd   = (hParent)? hParent : m_hWnd;
     m_tnd.uID    = uID;
     m_tnd.hIcon  = icon;
     m_tnd.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     m_tnd.uCallbackMessage = uCallbackMessage;
 
-    lstrcpyn(m_tnd.szTip, szToolTip, m_nMaxTooltipLength);
+    COPY(m_tnd.szTip, szToolTip);
 
 #ifdef SYSTEMTRAY_USEW2K
     if (m_bWin2K && szBalloonTip)
     {
-#if _MSC_VER < 0x1000
-        // The balloon tooltip text can be up to 255 chars long.
-//        ASSERT(AfxIsValidString(szBalloonTip)); 
-        ASSERT(lstrlen(szBalloonTip) < 256);
-#endif
-
-        // The balloon title text can be up to 63 chars long.
-        if (szBalloonTitle)
-        {
-//            ASSERT(AfxIsValidString(szBalloonTitle));
-            ASSERT(lstrlen(szBalloonTitle) < 64);
-        }
-
         // dwBalloonIcon must be valid.
         ASSERT(NIIF_NONE == dwBalloonIcon    || NIIF_INFO == dwBalloonIcon ||
                NIIF_WARNING == dwBalloonIcon || NIIF_ERROR == dwBalloonIcon);
@@ -204,11 +199,8 @@ BOOL CSystemTray::Create(HINSTANCE hInst, HWND hParent, UINT uCallbackMessage,
 
         m_tnd.uFlags |= NIF_INFO;
 
-        _tcsncpy_s(m_tnd.szInfo, szBalloonTip, 255);
-        if (szBalloonTitle)
-            _tcsncpy_s(m_tnd.szInfoTitle, szBalloonTitle, 63);
-        else
-            m_tnd.szInfoTitle[0] = _T('\0');
+        COPY(m_tnd.szInfo, szBalloonTip);
+        COPY(m_tnd.szInfoTitle, szBalloonTitle);
         m_tnd.uTimeout    = uBalloonTimeout * 1000; // convert time to ms
         m_tnd.dwInfoFlags = dwBalloonIcon;
     }
@@ -241,6 +233,9 @@ BOOL CSystemTray::Create(HINSTANCE hInst, HWND hParent, UINT uCallbackMessage,
         // Zero out the balloon text string so that later operations won't redisplay
         // the balloon.
         m_tnd.szInfo[0] = _T('\0');
+		m_tnd.szInfoTitle[0] = _T('\0');
+		m_tnd.dwInfoFlags = 0;
+		m_tnd.uTimeout = 0;
     }
 #endif
 
@@ -495,13 +490,11 @@ BOOL CSystemTray::StopAnimation()
 
 BOOL CSystemTray::SetTooltipText(LPCTSTR pszTip)
 {
-    ASSERT(_tcslen(pszTip) < m_nMaxTooltipLength);
-
     if (!m_bEnabled)
         return FALSE;
 
     m_tnd.uFlags = NIF_TIP;
-    _tcsncpy_s(m_tnd.szTip, pszTip, m_nMaxTooltipLength-1);
+    COPY(m_tnd.szTip, pszTip);
 
     if (m_bHidden)
         return TRUE;
@@ -511,12 +504,12 @@ BOOL CSystemTray::SetTooltipText(LPCTSTR pszTip)
 
 BOOL CSystemTray::SetTooltipText(UINT nID)
 {
-    TCHAR strBuffer[1024];
-    ASSERT(1024 >= m_nMaxTooltipLength);
+    TCHAR strBuffer[_countof(m_tnd.szTip)];
 
-    if (!LoadString(m_hInstance, nID, strBuffer, m_nMaxTooltipLength-1))
+    if (!LoadString(m_hInstance, nID, strBuffer, _countof(strBuffer)-1))
         return FALSE;
 
+	strBuffer[_countof(strBuffer)-1] = 0;
     return SetTooltipText(strBuffer);
 }
 
@@ -525,10 +518,9 @@ LPTSTR CSystemTray::GetTooltipText() const
     if (!m_bEnabled)
         return FALSE;
 
-    static TCHAR strBuffer[1024];
-    ASSERT(1024 >= m_nMaxTooltipLength);
+    static TCHAR strBuffer[_countof(m_tnd.szTip)];
 
-    lstrcpyn(strBuffer, m_tnd.szTip, m_nMaxTooltipLength);
+    COPY(strBuffer, m_tnd.szTip);
 
     return strBuffer;
 }
@@ -558,6 +550,7 @@ LPTSTR CSystemTray::GetTooltipText() const
 //////////////////////////////////////////////////////////////////////////
 // Added by Michael Dunn, November 1999
 //////////////////////////////////////////////////////////////////////////
+void ShowError(LPTSTR lpszFunction);
 
 BOOL CSystemTray::ShowBalloon(LPCTSTR szText,
                             LPCTSTR szTitle  /*=NULL*/,
@@ -569,20 +562,15 @@ BOOL CSystemTray::ShowBalloon(LPCTSTR szText,
 #else
     // Bail out if we're not on Win 2K.
     if (!m_bWin2K)
+	{
+//		TCHAR tmp[128];
+//		_sntprintf_s(tmp, 128, _T("!m_bWin2K\n"));
+//		MessageBox(NULL, tmp, _T("WTL"), MB_OK);
+
         return FALSE;
+	}
 
     // Verify input parameters.
-
-    // The balloon tooltip text can be up to 255 chars long.
-//    ASSERT(AfxIsValidString(szText));
-//    ASSERT(lstrlen(szText) < 256);
-
-    // The balloon title text can be up to 63 chars long.
-//    if (szTitle)
-//    {
-//        ASSERT(AfxIsValidString( szTitle));
-//        ASSERT(lstrlen(szTitle) < 64);
-//    }
 
     // dwBalloonIcon must be valid.
     ASSERT(NIIF_NONE == dwIcon    || NIIF_INFO == dwIcon ||
@@ -593,11 +581,8 @@ BOOL CSystemTray::ShowBalloon(LPCTSTR szText,
 
 
     m_tnd.uFlags = NIF_INFO;
-    _tcsncpy_s(m_tnd.szInfo, szText, _countof(m_tnd.szInfo));
-    if (szTitle)
-		_tcsncpy_s(m_tnd.szInfoTitle, szTitle, _countof(m_tnd.szInfoTitle));
-    else
-        m_tnd.szInfoTitle[0] = _T('\0');
+    COPY(m_tnd.szInfo, szText);
+    COPY(m_tnd.szInfoTitle, szTitle);
     m_tnd.dwInfoFlags = dwIcon;
     m_tnd.uTimeout = uTimeout * 1000;   // convert time to ms
 
@@ -606,6 +591,19 @@ BOOL CSystemTray::ShowBalloon(LPCTSTR szText,
     // Zero out the balloon text string so that later operations won't redisplay
     // the balloon.
     m_tnd.szInfo[0] = _T('\0');
+	m_tnd.szInfoTitle[0] = _T('\0');
+    m_tnd.dwInfoFlags = 0;
+    m_tnd.uTimeout = 0;
+
+//	if (!bSuccess)
+//		ShowError(_T("CSystemTray::ShowBalloon"));
+//	else
+//	{
+//		TCHAR tmp[128];
+//		_sntprintf_s(tmp, 128, _T("bSuccess = %d\n"), bSuccess);
+//		MessageBox(NULL, tmp, _T("WTL"), MB_OK);
+//	}
+
 
     return bSuccess;
 #endif

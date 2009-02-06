@@ -176,7 +176,6 @@ protected:
     static BOOL RemoveTaskbarIcon(HWND hWnd);
 
     static const UINT_PTR m_nTimerID;
-    static UINT  m_nMaxTooltipLength;
     static const UINT m_nTaskbarCreatedMsg;
     static HWND  m_hWndInvisible;
 
